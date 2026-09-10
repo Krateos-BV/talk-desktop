@@ -529,6 +529,9 @@ module.exports = {
 			},
 		}),
 
+		// The Homebrew cask installs the .app from an archive, not from the DMG.
+		BUILD_CONFIG.macosZip && new MakerZIP({}, ['darwin']),
+
 		BUILD_CONFIG.linuxZip && new MakerZIP({}, ['linux']),
 	].filter(Boolean),
 

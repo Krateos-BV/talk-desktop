@@ -6,9 +6,11 @@ name: Xenia CI (unsigned build)
 #
 # Distribution-artifact coverage differs by platform on purpose:
 #   Windows - full: MSI (WiX) + one-click EXE (Squirrel). This is XNT-61's scope.
-#   macOS   - .app bundle only. The DMG maker is broken on Node 24 (appdmg ->
+#   macOS   - .zip of the .app bundle. The DMG maker is broken on Node 24 (appdmg ->
 #             macos-alias calls util.isDate, removed in Node 23). Pre-existing
 #             upstream issue, not caused by the rebrand. DMG belongs to XNT-62.
+#             The zip is what the Homebrew cask installs from, so XNT-64 does not
+#             have to wait for the DMG fix.
 #   Linux   - .zip only. Flatpak needs flatpak-builder, eu-strip and GB-scale
 #             runtimes; that belongs to XNT-63.
 
@@ -74,16 +76,18 @@ jobs:
           git clone --branch="$TALK_VERSION" --depth=1 https://github.com/nextcloud/spreed out/.temp/spreed
           npm ci --prefix out/.temp/spreed
 
-      # Bundle only - see the DMG note in the workflow header.
-      - name: Build macOS app bundle (universal, unsigned)
+      # Zip only - see the DMG note in the workflow header.
+      - name: Build and package macOS (universal, unsigned, zip only)
         env:
           TALK_PATH: out/.temp/spreed
-        run: npm run build:mac
+        run: |
+          npm run build:mac
+          npx electron-forge make --skip-package --platform=darwin --arch=universal --targets=@electron-forge/maker-zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: xenia-talk-macos
-          path: out/Xenia Talk-darwin-universal/**
+          path: out/make/**
           if-no-files-found: error
 
   build-linux:

@@ -109,6 +109,13 @@ export type BuildConfigFile = {
 	macosDmg: boolean
 
 	/**
+	 * macOS .zip archive of the .app bundle.
+	 * Required by the Homebrew cask, which installs the bundle from an archive.
+	 * Default: true
+	 */
+	macosZip: boolean
+
+	/**
 	 * Linux Flatpak single-file installer.
 	 * Default: true
 	 */
