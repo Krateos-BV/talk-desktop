@@ -39,8 +39,8 @@ SPDX-FileAttributionText = "Generated from scripts/dmg-background-generator.html
 [[annotations]]
 path = ["img/wix-background.bmp", "img/wix-banner.bmp"]
 precedence = "aggregate"
-SPDX-FileCopyrightText = "2025 Nextcloud GmbH and Nextcloud contributors"
-SPDX-License-Identifier = "LicenseRef-NextcloudTrademarks"
+SPDX-FileCopyrightText = "2026 XeniaCloud"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
 
 [[annotations]]
 path = "resources/vue-devtools.crx"
@@ -55,7 +55,13 @@ SPDX-FileCopyrightText = "2017 Feandesign https://soundcloud.com/feandesign"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
-path = ["img/talk-**.svg", "img/icons/**", "img/squirrel-install-loading.gif", "img/server-logo-plain.svg", "Nextcloud-Talk-light.png", "Nextcloud-Talk-dark.png"]
+path = ["img/talk-**.svg", "img/icons/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 XeniaCloud"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = ["img/squirrel-install-loading.gif", "img/server-logo-plain.svg", "Nextcloud-Talk-light.png", "Nextcloud-Talk-dark.png"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Nextcloud GmbH <https://nextcloud.com/trademarks/>"
 SPDX-License-Identifier = "LicenseRef-NextcloudTrademarks"
