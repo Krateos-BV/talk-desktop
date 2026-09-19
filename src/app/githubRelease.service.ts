@@ -11,6 +11,61 @@ import { version } from '../../package.json'
 import { BUILD_CONFIG } from '../shared/build.config.ts'
 import { currentInstallerExt, isMac, platformTitle } from './system.utils.ts'
 
+// A plain-numeric tag with 3 or 4 dot-separated segments and no prerelease/build
+// suffix - e.g. "26.9.13" or "26.9.19.0" (this fork's CalVer YY.M.D[.ID] scheme,
+// XNT-138). `semver.valid()` rejects the 4-segment shape outright, which would
+// silently make every CalVer release invisible to the update checker (see
+// isValidVersionTag/compareVersionTags below).
+const CALVER_TAG_PATTERN = /^\d+(?:\.\d+){2,3}$/
+
+/**
+ * Whether a (possibly "v"-prefixed) tag is usable for update comparisons -
+ * either real semver (upstream's tags, including prerelease/build suffixes)
+ * or this fork's plain-numeric CalVer shape.
+ */
+function isValidVersionTag(tag: string): boolean {
+	const bare = tag.replace(/^v/, '')
+	return CALVER_TAG_PATTERN.test(bare) || valid(bare) !== null
+}
+
+/**
+ * Compare two (possibly "v"-prefixed) version tags for descending sort/lte.
+ * Plain-numeric CalVer tags (3 or 4 segments, no suffix) compare as numeric
+ * tuples - this also covers this fork's older 3-segment tags, and produces
+ * the same ordering semver itself would for a non-prerelease X.Y.Z tag, so
+ * it's a safe generalization rather than a behavior change for those.
+ * Anything else (a real semver prerelease/build tag) falls back to semver.
+ */
+function compareVersionTags(a: string, b: string): number {
+	const bareA = a.replace(/^v/, '')
+	const bareB = b.replace(/^v/, '')
+	if (CALVER_TAG_PATTERN.test(bareA) && CALVER_TAG_PATTERN.test(bareB)) {
+		const partsA = bareA.split('.').map(Number)
+		const partsB = bareB.split('.').map(Number)
+		for (let i = 0; i < 4; i++) {
+			const diff = (partsB[i] ?? 0) - (partsA[i] ?? 0)
+			if (diff !== 0) {
+				return diff
+			}
+		}
+		return 0
+	}
+	return rcompare(bareA, bareB)
+}
+
+/**
+ * Whether tag `a` is older than or equal to tag `b`, tolerating either
+ * version shape (see compareVersionTags).
+ */
+function isOlderOrEqualVersionTag(a: string, b: string): boolean {
+	const bareA = a.replace(/^v/, '')
+	const bareB = b.replace(/^v/, '')
+	if (CALVER_TAG_PATTERN.test(bareA) && CALVER_TAG_PATTERN.test(bareB)) {
+		return compareVersionTags(a, b) >= 0
+	}
+	return lte(bareA, bareB)
+}
+
 export type ReleaseInfo = {
 	/** Version tag, e.g., "v1.0.0" */
 	version: string
@@ -85,9 +140,9 @@ async function getLatestRelease(): Promise<{ latest?: ReleaseInfo, stable?: Rele
 				// rcompare/lte throw on a tag that isn't semver, and a throw here is swallowed
 				// by the catch below - so one stray tag (say, "latest") in the release
 				// repository would silently disable update checks for every client.
-				.filter((release) => valid(release.tag_name))
+				.filter((release) => isValidVersionTag(release.tag_name))
 				// GitHub releases are ordered by date (ID), but we need the latest by semantic version
-				.sort((a, b) => rcompare(a.tag_name, b.tag_name))
+				.sort((a, b) => compareVersionTags(a.tag_name, b.tag_name))
 
 			return {
 				latest: mapGitHubReleaseToReleaseInfo(releases[0]),
@@ -142,7 +197,7 @@ export async function checkForUpdate({ forceRequest = false }: { forceRequest?: 
 		return null
 	}
 
-	if (lte(latest.version, version)) {
+	if (isOlderOrEqualVersionTag(latest.version, version)) {
 		return null
 	}
 

@@ -305,6 +305,17 @@ module.exports = {
 		// https://github.com/squirrel/squirrel.windows
 		// https://js.electronforge.io/interfaces/_electron_forge_maker_squirrel.InternalOptions.SquirrelWindowsOptions.html#setupExe
 		BUILD_CONFIG.windowsExe && new MakerSquirrel({
+			// Squirrel.Windows' underlying .NET tool requires strict 3-segment SemVer for
+			// the NuGet package version and hard-rejects a 4th (CalVer .ID) segment:
+			// "Your package version is currently 26.9.19.0, which is *not* SemVer-compatible".
+			// Safe to truncate here specifically: this repo's update checker
+			// (githubRelease.service.ts) compares GitHub release tags directly and never
+			// reads this nupkg version, and Squirrel's own delta-update/autoUpdater APIs
+			// are never invoked - electron-squirrel-startup here only handles
+			// install/uninstall shortcut creation. The WiX MSI path (MakerWix) already
+			// takes the full 4-segment version natively, no truncation needed there.
+			version: packageJSON.version.split('.').slice(0, 3).join('.'),
+
 			// App/Filenames
 			name: BUILD_CONFIG.winSquirrelAppId,
 			setupExe: generateDistName('win32', TARGET_ARCH, '.exe'),
