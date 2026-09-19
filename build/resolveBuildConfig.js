@@ -50,6 +50,12 @@ function resolveBuildConfig() {
 		? new URL(buildConfig.domain).host.split('.').reverse().join('.')
 		: 'com.nextcloud'
 
+	// winUpgradeCode must be derived from the final winAppId (post-override), not the raw
+	// domain-derived appIdHost - otherwise overriding winAppId (or changing domain, which
+	// winAppId defaults from) silently changes the MSI's upgrade GUID and breaks in-place
+	// upgrades for already-installed users, even though winAppId itself looks unchanged.
+	const resolvedWinAppId = buildConfig.winAppId ?? `${appIdHost}.talk`
+
 	return {
 		// Default inferred values - can be overridden by the custom config
 		appleAppBundleId: `${appIdHost}.talk.mac`,
@@ -68,7 +74,7 @@ function resolveBuildConfig() {
 		isPlainBackground: buildConfig.backgroundColor !== buildConfigDefaults.backgroundColor,
 		withThemingOverrides: buildConfig.primaryColor !== buildConfigDefaults.primaryColor || buildConfig.backgroundColor !== buildConfigDefaults.backgroundColor,
 		winSquirrelAppId: applicationNameSanitized, // Special case for Squirrel.Windows
-		winUpgradeCode: UUIDv5(`${appIdHost}.talk`, TALK_DESKTOP_UUID),
+		winUpgradeCode: UUIDv5(resolvedWinAppId, TALK_DESKTOP_UUID),
 	}
 }
 
