@@ -79,6 +79,17 @@ function fixArtifactName(artifactPath, platform, arch) {
 		return artifactPath
 	}
 
+	// MakerSquirrel.js computes this .nupkg artifact's path from the RAW packageJSON.version,
+	// ignoring the truncated `version` we pass it to work around Squirrel.Windows' 3-segment
+	// SemVer requirement (see forge.config.js's MakerSquirrel config) - so under the CalVer
+	// YY.M.D.ID scheme this path never matches the file electron-winstaller actually wrote,
+	// and a rename here would throw ENOENT. Harmless to skip: the .nupkg is Squirrel's own
+	// internal delta-update package, never in xenia-release.yml's published asset list and
+	// never downloaded by users (this app's real update path is githubRelease.service.ts).
+	if (platform === 'win32' && ext === '.nupkg') {
+		return artifactPath
+	}
+
 	const name = generateDistName(platform, arch, ext)
 	const output = path.join(path.dirname(artifactPath), name)
 	if (name !== artifactName) {
@@ -305,6 +316,17 @@ module.exports = {
 		// https://github.com/squirrel/squirrel.windows
 		// https://js.electronforge.io/interfaces/_electron_forge_maker_squirrel.InternalOptions.SquirrelWindowsOptions.html#setupExe
 		BUILD_CONFIG.windowsExe && new MakerSquirrel({
+			// Squirrel.Windows' underlying .NET tool requires strict 3-segment SemVer for
+			// the NuGet package version and hard-rejects a 4th (CalVer .ID) segment:
+			// "Your package version is currently 26.9.19.0, which is *not* SemVer-compatible".
+			// Safe to truncate here specifically: this repo's update checker
+			// (githubRelease.service.ts) compares GitHub release tags directly and never
+			// reads this nupkg version, and Squirrel's own delta-update/autoUpdater APIs
+			// are never invoked - electron-squirrel-startup here only handles
+			// install/uninstall shortcut creation. The WiX MSI path (MakerWix) already
+			// takes the full 4-segment version natively, no truncation needed there.
+			version: packageJSON.version.split('.').slice(0, 3).join('.'),
+
 			// App/Filenames
 			name: BUILD_CONFIG.winSquirrelAppId,
 			setupExe: generateDistName('win32', TARGET_ARCH, '.exe'),
