@@ -200,6 +200,7 @@ jobs:
             'Xenia.Talk-windows-x64.msi' \
             'Xenia.Talk-windows-x64.exe' \
             'Xenia.Talk-macos-universal.zip' \
+            'Xenia.Talk-macos-universal.dmg' \
             'Xenia.Talk-linux-x64.flatpak' \
             'Xenia.Talk-linux-x64.zip'
           do
