@@ -79,6 +79,17 @@ function fixArtifactName(artifactPath, platform, arch) {
 		return artifactPath
 	}
 
+	// MakerSquirrel.js computes this .nupkg artifact's path from the RAW packageJSON.version,
+	// ignoring the truncated `version` we pass it to work around Squirrel.Windows' 3-segment
+	// SemVer requirement (see forge.config.js's MakerSquirrel config) - so under the CalVer
+	// YY.M.D.ID scheme this path never matches the file electron-winstaller actually wrote,
+	// and a rename here would throw ENOENT. Harmless to skip: the .nupkg is Squirrel's own
+	// internal delta-update package, never in xenia-release.yml's published asset list and
+	// never downloaded by users (this app's real update path is githubRelease.service.ts).
+	if (platform === 'win32' && ext === '.nupkg') {
+		return artifactPath
+	}
+
 	const name = generateDistName(platform, arch, ext)
 	const output = path.join(path.dirname(artifactPath), name)
 	if (name !== artifactName) {
