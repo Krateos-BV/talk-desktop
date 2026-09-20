@@ -1,69 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   inkscape:version="1.1-dev (f9311a1, 2019-12-25)"
-   id="svg19"
-   xml:space="preserve"
-   viewBox="0 0 1024 1024"
-   version="1.1"
-   stroke-miterlimit="1.4142"
-   stroke-linejoin="round"
-   fill-rule="evenodd"
-   clip-rule="evenodd"><metadata
-   id="metadata23"><rdf:RDF><cc:Work
-       rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
-         rdf:resource="http://purl.org/dc/dcmitype/StillImage" /><dc:title></dc:title></cc:Work></rdf:RDF></metadata><sodipodi:namedview
-   inkscape:current-layer="svg19"
-   inkscape:window-maximized="1"
-   inkscape:window-y="23"
-   inkscape:window-x="1440"
-   inkscape:cy="522.40348"
-   inkscape:cx="510.51379"
-   inkscape:zoom="0.67285156"
-   showgrid="false"
-   id="namedview21"
-   inkscape:window-height="1035"
-   inkscape:window-width="1920"
-   inkscape:pageshadow="2"
-   inkscape:pageopacity="0"
-   guidetolerance="10"
-   gridtolerance="10"
-   objecttolerance="10"
-   borderopacity="1"
-   inkscape:document-rotation="0"
-   bordercolor="#666666"
-   pagecolor="#ffffff" /><defs
-   id="defs15"><linearGradient
-     gradientUnits="userSpaceOnUse"
-     gradientTransform="matrix(8.96 0 0 8.96 -7.8457e-5 .00019795)"
-     y2="-7.6294e-6"
-     y1="150"
-     x2="150"
-     x1="18.23"
-     id="a"><stop
-       id="stop10"
-       offset="0"
-       stop-color="#001233" /><stop
-       id="stop11"
-       offset="0.55"
-       stop-color="#002266" /><stop
-       id="stop12"
-       offset="1"
-       stop-color="#003399" /></linearGradient></defs>
-<rect
-   id="rect17"
-   fill-rule="evenodd"
-   fill="url(#a)"
-   height="1024"
-   width="1024"
-   rx="160" /><g id="glyph" fill="#ffffff">
-   <rect x="475.78" y="199.58" width="362.22" height="289.78" rx="81.5"/>
-   <rect x="186" y="380.69" width="416.56" height="326" rx="99.61"/>
-   <path d="M294.67 706.69 L204.11 824.42 L394.28 706.69 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" version="1.1"
+   stroke-miterlimit="1.4142" stroke-linejoin="round" fill-rule="evenodd" clip-rule="evenodd">
+<defs>
+<linearGradient gradientUnits="userSpaceOnUse" gradientTransform="matrix(8.96 0 0 8.96 -7.8457e-5 .00019795)"
+  y2="-7.6294e-6" y1="150" x2="150" x1="18.23" id="a">
+  <stop offset="0" stop-color="#001233" />
+  <stop offset="0.55" stop-color="#002266" />
+  <stop offset="1" stop-color="#003399" />
+</linearGradient>
+</defs>
+<rect fill="url(#a)" height="1024" width="1024" rx="160" />
+<g fill="#ffffff">
+   <rect x="138.25" y="572" width="430" height="300" rx="95"/>
+   <rect x="455.75" y="152" width="430" height="300" rx="95"/>
+   <path d="M238.25 872 L153.25 977 L333.25 872 Z"/>
+   <path d="M785.75 452 L870.75 557 L690.75 452 Z"/>
 </g></svg>

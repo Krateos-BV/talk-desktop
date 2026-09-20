@@ -1,40 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   width="100%"
-   height="100%"
-   viewBox="0 0 652 653"
-   version="1.1"
-   xml:space="preserve"
-   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;fill:#ffffff"
-   id="svg7761"
-   sodipodi:docname="talk-icon-plain-dark-spaced.svg"
-   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg"><defs
-   id="defs7765" /><sodipodi:namedview
-   id="namedview7763"
-   pagecolor="#ffffff"
-   bordercolor="#000000"
-   borderopacity="0.25"
-   inkscape:showpageshadow="2"
-   inkscape:pageopacity="0.0"
-   inkscape:pagecheckerboard="0"
-   inkscape:deskcolor="#d1d1d1"
-   showgrid="false"
-   inkscape:zoom="1.5344564"
-   inkscape:cx="303.03892"
-   inkscape:cy="326.5"
-   inkscape:window-width="2560"
-   inkscape:window-height="1369"
-   inkscape:window-x="1912"
-   inkscape:window-y="1106"
-   inkscape:window-maximized="1"
-   inkscape:current-layer="svg7761" />
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 654.06 721.88" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;fill:#ffffff">
     <g id="glyph">
-        <rect x="294.44" y="53.82" width="315.57" height="252.45" rx="71"/>
-        <rect x="41.99" y="211.61" width="362.9" height="284.01" rx="86.78"/>
-        <path d="M136.66 495.62 L57.77 598.18 L223.44 495.62 Z"/>
+        <rect x="0" y="367.5" width="376.25" height="262.5" rx="83.13"/>
+        <rect x="277.81" y="0" width="376.25" height="262.5" rx="83.13"/>
+        <path d="M87.5 630 L13.13 721.88 L170.63 630 Z"/>
+        <path d="M566.56 262.5 L640.94 354.38 L483.44 262.5 Z"/>
     </g>
 </svg>
