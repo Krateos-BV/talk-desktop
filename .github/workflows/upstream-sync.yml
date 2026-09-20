@@ -1,0 +1,88 @@
+name: Upstream Sync
+
+# Periodically checks nextcloud/talk-desktop:main for commits we don't have yet and
+# opens a PR merging them into our main. This fork has diverged significantly on
+# branding, login-server lock, update-checker/CalVer versioning, and release
+# packaging (see .github/workflows/xenia-release.yml and .overrides/build.config.json),
+# so upstream changes are NEVER auto-merged - a human must review for conflicts with
+# those Xenia-specific changes before merging the PR.
+#
+# If the merge step hits a conflict, the job fails and no PR is opened; resolve it
+# manually (checkout a branch, `git merge upstream/main`, fix conflicts, open a PR).
+
+on:
+  schedule:
+    # Every Monday 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/nextcloud/talk-desktop.git
+          git fetch upstream main
+
+      - name: Check for new upstream commits
+        id: check
+        run: |
+          count=$(git log main..upstream/main --oneline | wc -l | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Found $count new upstream commit(s)"
+
+      - name: Skip if nothing new
+        if: steps.check.outputs.count == '0'
+        run: echo "No new upstream commits, nothing to do."
+
+      - name: Create sync branch and merge upstream
+        if: steps.check.outputs.count != '0'
+        run: |
+          branch="upstream-sync/$(date +%Y-%m-%d)"
+          git checkout -b "$branch"
+          git merge upstream/main --no-edit
+          git push origin "$branch"
+          echo "SYNC_BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Open PR
+        if: steps.check.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shortlog=$(git log main..upstream/main --oneline)
+          gh pr create \
+            --base main \
+            --head "$SYNC_BRANCH" \
+            --title "Upstream sync: $(date +%Y-%m-%d)" \
+            --body "$(cat <<EOF
+          Automated sync from [nextcloud/talk-desktop](https://github.com/nextcloud/talk-desktop) main.
+
+          This fork has diverged on branding, login-server lock, the update-checker/CalVer
+          versioning scheme, and release packaging - review carefully before merging,
+          especially any changes touching package.json version, branding assets, icons,
+          login/auth, or the update checker.
+
+          Upstream commits included:
+          \`\`\`
+          $shortlog
+          \`\`\`
+
+          **This PR is never auto-merged.**
+          EOF
+          )"
