@@ -1,8 +1,9 @@
 <svg viewBox="0 0 224 146" xmlns="http://www.w3.org/2000/svg" fill="#ffffff">
   <g id="glyph">
-    <rect x="106.44" y="2.08" width="55.56" height="44.44" rx="12.5"/>
-    <rect x="62" y="29.86" width="63.89" height="50" rx="15.28"/>
-    <path d="M78.67 79.86 L64.78 97.92 L93.94 79.86 Z"/>
+    <rect x="68.58" y="50.83" width="49.95" height="34.85" rx="11.04"/>
+    <rect x="105.47" y="2.04" width="49.95" height="34.85" rx="11.04"/>
+    <path d="M80.2 85.68 L70.32 97.88 L91.23 85.68 Z"/>
+    <path d="M143.8 36.89 L153.68 49.09 L132.77 36.89 Z"/>
   </g>
   <text x="112" y="144" text-anchor="middle" xml:space="preserve" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif" font-size="34"><tspan font-weight="300">Xenia </tspan><tspan font-weight="700">Talk</tspan></text>
 </svg>
