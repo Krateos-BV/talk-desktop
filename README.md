@@ -12,9 +12,6 @@
 > Independently maintained desktop client for Xenia Talk, based on Nextcloud Talk (AGPLv3). Not affiliated with or endorsed by Nextcloud GmbH.
 <img width="1401" height="900" alt="image" src="https://github.com/user-attachments/assets/44bc4dd6-749c-4efc-8103-c718a22f7165" />
 
-![Xenia Talk](./Nextcloud-Talk-light.png#gh-light-mode-only)
-![Xenia Talk](./Nextcloud-Talk-dark.png#gh-dark-mode-only)
-
 ## 📥 Install
 
 All binaries are available on [Xenia Talk Releases](https://github.com/Krateos-BV/talk-desktop/releases).
@@ -33,8 +30,7 @@ Installation of flatpak on Linux: Ensure you have Flatpak installed on your syst
 
 ## 🏗️ Prerequisites
 
-- [Nextcloud Server](https://github.com/nextcloud/server) version 27 or higher.
-- [Nextcloud Talk](https://github.com/nextcloud/spreed) version 17 or higher.
+- [XeniaCloud Account](https://auth.xeniacloud.eu/if/flow/xenia-enrollment/)
 
 ## 👥 Multi-account
 
