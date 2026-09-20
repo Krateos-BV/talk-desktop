@@ -10,6 +10,7 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Krateos-BV/talk-desktop/total?style=flat)
 
 > Independently maintained desktop client for Xenia Talk, based on Nextcloud Talk (AGPLv3). Not affiliated with or endorsed by Nextcloud GmbH.
+<img width="1401" height="900" alt="image" src="https://github.com/user-attachments/assets/44bc4dd6-749c-4efc-8103-c718a22f7165" />
 
 ![Xenia Talk](./Nextcloud-Talk-light.png#gh-light-mode-only)
 ![Xenia Talk](./Nextcloud-Talk-dark.png#gh-dark-mode-only)
