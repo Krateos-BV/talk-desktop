@@ -3,45 +3,32 @@
   - SPDX-License-Identifier: CC0-1.0
 -->
 
-# Nextcloud Talk Desktop
+# Xenia Talk Desktop
 
-[![REUSE status](https://api.reuse.software/badge/github.com/nextcloud/talk-desktop)](https://api.reuse.software/info/github.com/nextcloud/talk-desktop)
-[![GitHub Release Stable](https://img.shields.io/github/v/release/nextcloud-releases/talk-desktop?sort=semver&display_name=tag&style=flat)](https://github.com/nextcloud-releases/talk-desktop/releases/latest)
-[![GitHub Release Beta](https://img.shields.io/github/v/release/nextcloud-releases/talk-desktop?include_prereleases&sort=semver&display_name=tag&style=flat)](https://github.com/nextcloud-releases/talk-desktop/releases/)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/nextcloud-releases/talk-desktop/total?style=flat)
+[![REUSE status](https://api.reuse.software/badge/github.com/Krateos-BV/talk-desktop)](https://api.reuse.software/info/github.com/Krateos-BV/talk-desktop)
+[![GitHub Release Stable](https://img.shields.io/github/v/release/Krateos-BV/talk-desktop?sort=semver&display_name=tag&style=flat)](https://github.com/Krateos-BV/talk-desktop/releases/latest)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Krateos-BV/talk-desktop/total?style=flat)
 
-> Official Nextcloud Talk Desktop client
+> Independently maintained desktop client for Xenia Talk, based on Nextcloud Talk (AGPLv3). Not affiliated with or endorsed by Nextcloud GmbH.
 
-![Nextcloud Talk](./Nextcloud-Talk-light.png#gh-light-mode-only)
-![Nextcloud Talk](./Nextcloud-Talk-dark.png#gh-dark-mode-only)
+![Xenia Talk](./Nextcloud-Talk-light.png#gh-light-mode-only)
+![Xenia Talk](./Nextcloud-Talk-dark.png#gh-dark-mode-only)
 
 ## 📥 Install
 
-All binaries and `beta` releases are available on [Nextcloud Releases](https://github.com/nextcloud-releases/talk-desktop/releases).
+All binaries are available on [Xenia Talk Releases](https://github.com/Krateos-BV/talk-desktop/releases).
 
-| Platform (arch)          | Distribution type                                                                                                           | Download link                                                                                                                                        |
-|--------------------------|-----------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **🐧 Linux** (x64)       | [Flatpak](https://flatpak.org) single file (recommended), see note below                                                    | [Nextcloud.Talk-linux-x64.flatpak](https://github.com/nextcloud-releases/talk-desktop/releases/latest/download/Nextcloud.Talk-linux-x64.flatpak)     |
-| **🐧 Linux** (x64)       | ZIP archive                                                                                                                 | [Nextcloud.Talk-linux-x64.zip](https://github.com/nextcloud-releases/talk-desktop/releases/latest/download/Nextcloud.Talk-linux-x64.zip)             |
-| **🍎 macOS** (Universal) | Disc Image                                                                                                                  | [Nextcloud.Talk-macos-universal.dmg](https://github.com/nextcloud-releases/talk-desktop/releases/latest/download/Nextcloud.Talk-macos-universal.dmg) |
-| **🪟 Windows** (x64)     | Non-admin single-user one-click installer (recommended)                                                                     | [Nextcloud.Talk-windows-x64.exe](https://github.com/nextcloud-releases/talk-desktop/releases/latest/download/Nextcloud.Talk-windows-x64.exe)         |
-| **🪟 Windows** (x64)     | [MSI](https://github.com/electron-userland/electron-wix-msi/blob/master/guides/enduser.md) (for administrated environments) | [Nextcloud.Talk-windows-x64.msi](https://github.com/nextcloud-releases/talk-desktop/releases/latest/download/Nextcloud.Talk-windows-x64.msi)         |
+| Platform (arch)          | Distribution type                                                                                                           | Download link                                                                                                                              |
+|--------------------------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **🐧 Linux** (x64)       | [Flatpak](https://flatpak.org) single file (recommended), see note below                                                    | [Xenia.Talk-linux-x64.flatpak](https://github.com/Krateos-BV/talk-desktop/releases/latest/download/Xenia.Talk-linux-x64.flatpak)             |
+| **🐧 Linux** (x64)       | ZIP archive                                                                                                                 | [Xenia.Talk-linux-x64.zip](https://github.com/Krateos-BV/talk-desktop/releases/latest/download/Xenia.Talk-linux-x64.zip)                     |
+| **🍎 macOS** (Universal) | Disc Image                                                                                                                  | [Xenia.Talk-macos-universal.dmg](https://github.com/Krateos-BV/talk-desktop/releases/latest/download/Xenia.Talk-macos-universal.dmg)         |
+| **🪟 Windows** (x64)     | Non-admin single-user one-click installer (recommended)                                                                     | [Xenia.Talk-windows-x64.exe](https://github.com/Krateos-BV/talk-desktop/releases/latest/download/Xenia.Talk-windows-x64.exe)                 |
+| **🪟 Windows** (x64)     | [MSI](https://github.com/electron-userland/electron-wix-msi/blob/master/guides/enduser.md) (for administrated environments) | [Xenia.Talk-windows-x64.msi](https://github.com/Krateos-BV/talk-desktop/releases/latest/download/Xenia.Talk-windows-x64.msi)                 |
 
 Installation of flatpak on Linux: Ensure you have Flatpak installed on your system. Then, use the command `flatpak install <path-to-flatpakref-file>` in the terminal, replacing `<path-to-flatpakref-file>` with the actual path to your Flatpak file.
 
-### via Package manager
-
-| Platform       | Package manager                                                                       | Command                              | Status                                                                                    |
-|----------------|---------------------------------------------------------------------------------------|--------------------------------------|-------------------------------------------------------------------------------------------|
-| **🪟 Windows** | [Windows Package Manager](https://learn.microsoft.com/en-us/windows/package-manager/) | `winget install Nextcloud.Talk`      | ![WinGet Package Version](https://img.shields.io/winget/v/Nextcloud.Talk?style=flat)      |
-| **🪟 Windows** | [Windows Package Manager](https://learn.microsoft.com/en-us/windows/package-manager/) | `winget install Nextcloud.Talk.Beta` | ![WinGet Package Version](https://img.shields.io/winget/v/Nextcloud.Talk.Beta?style=flat) |                                                                                     |
-
-#### Community supported packages
-
-| Platform       | Package manager                                           | Command                        | Status                                                                                       |
-|----------------|-----------------------------------------------------------|--------------------------------|----------------------------------------------------------------------------------------------|
-| **🍎 macOS** | [Homebrew](https://formulae.brew.sh/cask/nextcloud-talk#default) | `brew install --cask nextcloud-talk` | ![Homebrew Package](https://img.shields.io/homebrew/cask/v/nextcloud-talk?style=flat) | 
-| **🪟 Windows** | [Chocolatey Community](https://community.chocolatey.org/) | `choco install nextcloud-talk` | ![Chocolatey Package Version](https://img.shields.io/chocolatey/v/nextcloud-talk?style=flat) |
+> This fork does not currently publish to winget, Chocolatey, or Homebrew — install one of the binaries above instead.
 
 ## 🏗️ Prerequisites
 
@@ -50,21 +37,21 @@ Installation of flatpak on Linux: Ensure you have Flatpak installed on your syst
 
 ## 👥 Multi-account
 
-Full multi-account currently [is not currently supported](https://github.com/nextcloud/talk-desktop/issues/7).
+Full multi-account currently [is not currently supported](https://github.com/Krateos-BV/talk-desktop/issues).
 
-However, using portable `zip` distribution, you can have several Nextcloud Talk instances run simultaneously. Just rename the executable from default  `Nextcloud Talk` to a custom name. For example: 
+However, using portable `zip` distribution, you can have several Xenia Talk instances run simultaneously. Just rename the executable from default  `Xenia Talk` to a custom name. For example: 
 
 ```
 /path/to/apps/
 ├── home-apps/
-│   └── Nextcloud Talk/
+│   └── Xenia Talk/
 │       ├── ...
-│       ├── Nextcloud Talk (Home).exe
+│       ├── Xenia Talk (Home).exe
 │       └── ...
 └── work-apps/
-    └── Nextcloud Talk/
+    └── Xenia Talk/
         ├── ...
-        ├── Nextcloud Talk (Work).exe
+        ├── Xenia Talk (Work).exe
         └── ...
 ```
 
@@ -93,9 +80,9 @@ Set application configuration.
 Examples:
 
 ```sh
-./Nextcloud\ Talk config --accounts=cloud.company.tld
-./Nextcloud\ Talk config --accounts='Name Surname@cloud.company.tld'
-./Nextcloud\ Talk config --accounts=name@email.tld@company.tld/nextcloud
+./Xenia\ Talk config --accounts=cloud.company.tld
+./Xenia\ Talk config --accounts='Name Surname@cloud.company.tld'
+./Xenia\ Talk config --accounts=name@email.tld@company.tld/nextcloud
 ```
 
 ## 🛠️ Development Setup
@@ -104,7 +91,7 @@ Examples:
 	 ```bash
 	 npm ci 
 	 ```
-2. Nextcloud Talk Desktop requires [Nextcloud Talk source code](https://github.com/nextcloud/spreed).
+2. Xenia Talk Desktop requires [Nextcloud Talk source code](https://github.com/nextcloud/spreed) (Xenia Talk's server-side app is a Nextcloud Talk deployment).
    - **No `nextcloud/spreed` is cloned?**\
      Clone it and install dependencies:
 	   ```sh
