@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 XeniaCloud
+# SPDX-License-Identifier: MIT
+
 name: Xenia Release
 
 # Cuts a GitHub Release on this fork from a version tag, with the platform artifacts

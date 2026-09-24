@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 XeniaCloud
+# SPDX-License-Identifier: MIT
+
 name: Xenia CI (unsigned build)
 
 # Verifies that the Xenia-branded Talk desktop client builds on all three desktop
