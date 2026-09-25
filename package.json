@@ -1,6 +1,10 @@
 {
   "name": "talk-desktop",
+<<<<<<< HEAD
   "version": "26.9.19.0",
+=======
+  "version": "2.3.2",
+>>>>>>> upstream/main
   "private": true,
   "bugs": {
     "url": "https://github.com/Krateos-BV/talk-desktop/issues",
@@ -63,15 +67,20 @@
     "@nextcloud/notify_push": "^1.4.0",
     "@nextcloud/router": "^3.1.0",
     "@nextcloud/vue": "^9.12.0",
+<<<<<<< HEAD
     "@vueuse/core": "^14.4.0",
+=======
+    "@vueuse/core": "^15.0.0",
+>>>>>>> upstream/main
     "core-js": "^3.50.0",
     "electron-squirrel-startup": "^1.0.1",
     "howler": "^2.2.4",
     "mri": "^1.2.0",
     "pinia": "^4.0.3",
     "semver": "^7.8.5",
+    "talk": "github:nextcloud-releases/spreed#semver:*",
     "unzip-crx-3": "^0.2.0",
-    "vue": "^3.5.42",
+    "vue": "^3.5.43",
     "vue-material-design-icons": "^5.3.1",
     "vue-router": "^5.3.1",
     "webdav": "^5.10.0"
@@ -91,7 +100,7 @@
     "@vue/tsconfig": "^0.9.1",
     "cheerio": "^1.2.0",
     "css-loader": "^7.1.5",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.0",
     "electron": "^44.3.0",
     "esbuild-loader": "^4.5.0",
     "eslint": "^10.10.0",
@@ -107,7 +116,7 @@
     "typescript": "^6.0.3",
     "vue-loader": "^17.4.2",
     "vue-tsc": "^3.3.11",
-    "webpack": "^5.110.3",
+    "webpack": "^5.111.0",
     "webpack-merge": "^6.0.1",
     "worker-loader": "^3.0.8",
     "zx": "^8.8.5"
@@ -127,6 +136,7 @@
     "esbuild": true,
     "sharp": true
   },
+<<<<<<< HEAD
   "desktopName": "eu.xeniacloud.talk.desktop",
   "productName": "Xenia Talk",
   "talk": {
@@ -134,4 +144,8 @@
     "beta": "v25.0.0",
     "dev": "main"
   }
+=======
+  "desktopName": "com.nextcloud.talk.desktop",
+  "productName": "Nextcloud Talk"
+>>>>>>> upstream/main
 }
