@@ -62,7 +62,7 @@ export async function extractNextcloudStyles({
 
 	const { version, versionstring: versionString } = await $`docker exec ${CONTAINER} curl -s localhost/status.php`.json()
 	const versionMajor = +version.split('.')[0]
-	const versionCommitHash = (await $`docker exec -u www-data ${CONTAINER} git -C /var/www/html rev-parse --short HEAD`.text()).trim()
+	const versionCommitHash = (await $`docker exec -u www-data ${CONTAINER} git -C /var/www/html rev-parse --short=8 HEAD`.text()).trim()
 	echo(chalk.yellow(`Nextcloud Server ${versionString} is ready`))
 
 	// --- PREPARING DEST -------------------------------------------------------------------------------------------------
@@ -77,11 +77,12 @@ export async function extractNextcloudStyles({
 
 	// --- COPYING STATIC FILES -------------------------------------------------------------------------------------------
 
-	echo(chalk.cyan('· Copying static styles ...'))
+	echo(chalk.cyan('· Copying static styles and base assets ...'))
 
 	await Promise.all([
 		dockerCp(CONTAINER, '/var/www/html/', 'dist/icons.css'),
 		dockerCp(CONTAINER, '/var/www/html/', 'core/css/server.css'),
+		dockerCp(CONTAINER, '/var/www/html/', 'core/img/favicon.ico'),
 		dockerCp(CONTAINER, '/var/www/html/', 'core/img/filetypes/'),
 		dockerCp(CONTAINER, '/var/www/html/', 'core/img/logo/'),
 		dockerCp(CONTAINER, '/var/www/html/', 'apps/theming/css/default.css'),
