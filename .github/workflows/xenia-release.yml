@@ -104,9 +104,67 @@ jobs:
           git clone --branch="$TALK_VERSION" --depth=1 https://github.com/nextcloud/spreed out/.temp/spreed
           npm ci --prefix out/.temp/spreed
 
-      - name: Build macOS app bundle (universal, unsigned)
+      # Signing is opt-in and degrades safely. With no APPLE_* secrets resolvable this
+      # step reports "unsigned" and exits 0, forge.config.js's `hasMacosSign` stays false,
+      # and the job produces exactly the unsigned bundle it produced before. Signing turns
+      # itself on the moment the secrets resolve, with no further change here.
+      #
+      # Note a secret that EXISTS at org level but is not scoped to this repository
+      # resolves to an empty string, not an error — that is how XNT-184's four dispatches
+      # died. So "unsigned" below means "no usable secret", which covers both absent and
+      # unscoped. Check the org secret's repository access before assuming it is missing.
+      - name: Import Developer ID certificate
+        id: signing
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APPLE_CERT_P12:-}" ]; then
+            echo "::warning::APPLE_CERT_P12 did not resolve - building UNSIGNED. See the note above about org-secret scoping."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Auto-lock after 6h so the key cannot outlive the job on a reused runner.
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo "$APPLE_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "${APPLE_CERT_PASSWORD:-}" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          # Without this, codesign prompts for keychain access and hangs the job forever.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+
+          # Prepend, don't replace: dropping the login keychain breaks unrelated tooling.
+          security list-keychain -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          if ! security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Developer ID Application"; then
+            echo "::error::Certificate imported but no 'Developer ID Application' identity is present."
+            echo "Most likely the .p12 was exported without its private key - re-export selecting BOTH rows in Keychain Access."
+            exit 1
+          fi
+
+          echo "Developer ID Application identity available."
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build macOS app bundle (universal)
         env:
           TALK_PATH: out/.temp/spreed
+          # forge.config.js:156 gates on these three. Empty values leave hasMacosSign
+          # false, which is the unsigned path - not a failure.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run build:mac
 
       # Builds every darwin distributable: .zip and .dmg. The DMG maker used to fail on
@@ -123,6 +181,13 @@ jobs:
           name: release-macos
           path: out/make/**
           if-no-files-found: error
+
+      # Last step in the job on purpose: the keychain must outlive both `build:mac`
+      # (which signs and notarises) and `package:mac` (which builds the .dmg/.zip from
+      # the signed bundle). `always()` so a failed build still cleans up.
+      - name: Remove signing keychain
+        if: always() && steps.signing.outputs.signed == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
 
   build-linux:
     needs: verify-tag
