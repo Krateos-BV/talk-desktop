@@ -121,8 +121,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -z "${APPLE_CERT_P12:-}" ]; then
-            echo "::warning::APPLE_CERT_P12 did not resolve - building UNSIGNED. See the note above about org-secret scoping."
+          # Report EVERY unresolved key, not just the certificate. A partially-scoped
+          # secret set is the nastiest case: the cert imports fine, hasMacosSign is still
+          # false because a notarisation var is empty, and the job silently produces an
+          # unsigned build with nothing obviously wrong. Naming the exact keys here means
+          # one glance at this log distinguishes "not scoped to this repo" from "signing
+          # is broken".
+          missing=""
+          for key in APPLE_CERT_P12 APPLE_CERT_PASSWORD APPLE_ID APPLE_ID_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "$(eval "printf '%s' \"\${$key:-}\"")" ]; then
+              missing="$missing $key"
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::warning::UNSIGNED BUILD. These secrets did not resolve in this repository:$missing"
+            echo ""
+            echo "This is the documented degrade path, not a failure."
+            echo ""
+            echo "An org-level secret that exists but is NOT scoped to this repository resolves"
+            echo "to an EMPTY STRING, not an error (this is how XNT-184's dispatches died)."
+            echo "Krateos-BV scopes the APPLE_* secrets by platform relevance, and talk-desktop"
+            echo "is a cross-platform Electron repo that builds macOS, Linux and Windows - so it"
+            echo "may simply not be on the selected-repositories list."
+            echo ""
+            echo "Check: GitHub org -> Settings -> Secrets and variables -> Actions -> the secret"
+            echo "-> Repository access. Add talk-desktop if absent. No code change is needed."
             echo "signed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -154,7 +178,7 @@ jobs:
             exit 1
           fi
 
-          echo "Developer ID Application identity available."
+          echo "Developer ID Application identity available; all five APPLE_* secrets resolved."
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Build macOS app bundle (universal)
