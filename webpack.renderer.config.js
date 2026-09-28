@@ -180,6 +180,7 @@ const webpackRendererConfig = {
 				test: /\.ogg$/,
 				type: 'asset/resource',
 			},
+<<<<<<< HEAD
 			// Rebrand bundled translation catalogs (Talk's and our own) on branded builds.
 			// See build/l10n-rebrand-loader.js.
 			{
@@ -195,6 +196,8 @@ const webpackRendererConfig = {
 				include: path.resolve(TALK_PATH, 'src'),
 				use: [path.resolve(__dirname, 'build/spreed-literal-rebrand-loader.js')],
 			},
+=======
+>>>>>>> upstream/main
 			{
 				// Talk requests assets from @mediapipe/tasks-vision and @sapphi-red/web-noise-suppressor by a path relative to Talk
 				// For example, new URL('../../node_modules/@sapphi-red/web-noise-suppressor/dist/rnnoise.wasm', import.meta.url)

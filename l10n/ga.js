@@ -63,10 +63,20 @@ OC.L10N.register(
     "System default" : "Réamhshocrú córais",
     "Light" : "Solas",
     "Dark" : "Dorcha",
+<<<<<<< HEAD
     "Use monochrome tray icon" : "Úsáid deilbhín tráidire monacrómach",
     "Use system title bar" : "Úsáid barra teidil an chórais",
     "Accessibility" : "Inrochtaineacht",
     "Dyslexia font" : "Cló disléicse",
+=======
+    "System integration" : "Comhtháthú córas",
+    "Use monochrome tray icon" : "Úsáid deilbhín tráidire monacrómach",
+    "Use system title bar" : "Úsáid barra teidil an chórais",
+    "Accessibility" : "Inrochtaineacht",
+    "High contrast" : "Ardchodarsnacht",
+    "Dyslexia font" : "Cló disléicse",
+    "Use OpenDyslexic font, created to help with some symptoms of dyslexia" : "Bain úsáid as an gcló OpenDyslexic, a cruthaíodh chun cabhrú le cuid de na hairíonna a bhaineann le disléicse",
+>>>>>>> upstream/main
     "Notifications & Sounds" : "Fógraí & Fuaimeanna",
     "Play chat notification sound" : "Seinn an fhuaim fógra comhrá",
     "Play call notification sound" : "Seinn an fhuaim fógra glaonna",

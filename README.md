@@ -84,6 +84,7 @@ Examples:
 
 ## 🛠️ Development Setup
 
+<<<<<<< HEAD
 1. Install dependencies
 	 ```bash
 	 npm ci 
@@ -106,6 +107,31 @@ Examples:
      TALK_PATH=/path/to/nextcloud/server/apps-extra/spreed/
      ```
 3. Check `.env.example` for any additional configuration if needed.
+=======
+Install dependencies:
+```bash
+npm ci 
+```
+
+### Advanced setup
+
+By default, Talk Desktop bundles a specific Talk frontend installed as an npm dependency.
+To develop with a different version, an unreleased branch or local version, clone it to `./spreed`:
+
+```sh
+# Clone to ./spreed
+git clone https://github.com/nextcloud/spreed
+
+# And install dependencies in spreed as well
+npm --prefix=spreed ci
+```
+
+To use local Talk from a different path, for example, a local Nextcloud server setup, set `TALK_PATH` ENV variable or edit `.env` file:
+
+```sh
+TALK_PATH=/path/to/nextcloud/server/apps-extra/spreed/
+```
+>>>>>>> upstream/main
 
 ## 🧑‍💻 Development
 

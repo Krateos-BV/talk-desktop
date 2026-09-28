@@ -63,10 +63,20 @@ OC.L10N.register(
     "System default" : "Süsteemi kujundus",
     "Light" : "Tume kujundus",
     "Dark" : "Hele kujundus",
+<<<<<<< HEAD
     "Use monochrome tray icon" : "Kasuta ühevärvilist süsteemi ikooni",
     "Use system title bar" : "Kasuta süsteemi tiitliriba",
     "Accessibility" : "Hõlbustus ja ligipääsetavus",
     "Dyslexia font" : "Düsleksia kirjatüüp",
+=======
+    "System integration" : "Süsteemilõiming",
+    "Use monochrome tray icon" : "Kasuta ühevärvilist süsteemi ikooni",
+    "Use system title bar" : "Kasuta süsteemi tiitliriba",
+    "Accessibility" : "Hõlbustus ja ligipääsetavus",
+    "High contrast" : "Kõrge kontrastsusega režiim",
+    "Dyslexia font" : "Düsleksia kirjatüüp",
+    "Use OpenDyslexic font, created to help with some symptoms of dyslexia" : "Kasuta OpenDyslexic kirjatüüpi, millest võib mõnede düsleksia sümptomite puhul kasu olla",
+>>>>>>> upstream/main
     "Notifications & Sounds" : "Teavitused ja helid",
     "Play chat notification sound" : "Esita vestluse teavitusheli",
     "Play call notification sound" : "Esita kõne teavitusheli",

@@ -26,6 +26,11 @@ OC.L10N.register(
     "Theme" : "Estilu",
     "Light" : "Claridá",
     "Dark" : "Escuridá",
+<<<<<<< HEAD
+=======
+    "Accessibility" : "Accesibilidá",
+    "Dyslexia font" : "Fonte pa persones dislexiques",
+>>>>>>> upstream/main
     "Reload" : "Volver cargar",
     "Zoom" : "Zoom",
     "Zoom out" : "Alloñar",
