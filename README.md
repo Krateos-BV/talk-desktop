@@ -9,8 +9,15 @@
 [![GitHub Release Stable](https://img.shields.io/github/v/release/Krateos-BV/talk-desktop?sort=semver&display_name=tag&style=flat)](https://github.com/Krateos-BV/talk-desktop/releases/latest)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Krateos-BV/talk-desktop/total?style=flat)
 
+<<<<<<< HEAD
 > Independently maintained desktop client for Xenia Talk, based on Nextcloud Talk (AGPLv3). Not affiliated with or endorsed by Nextcloud GmbH.
 <img width="1401" height="900" alt="image" src="https://github.com/user-attachments/assets/44bc4dd6-749c-4efc-8103-c718a22f7165" />
+=======
+> Use [Nextcloud Talk](https://github.com/nextcloud/spreed/) on your desktop without opening a web browser
+
+![Nextcloud Talk](./Nextcloud-Talk-light.png#gh-light-mode-only)
+![Nextcloud Talk](./Nextcloud-Talk-dark.png#gh-dark-mode-only)
+>>>>>>> upstream/main
 
 ## 📥 Install
 
@@ -84,6 +91,7 @@ Examples:
 
 ## 🛠️ Development Setup
 
+<<<<<<< HEAD
 1. Install dependencies
 	 ```bash
 	 npm ci 
@@ -106,6 +114,31 @@ Examples:
      TALK_PATH=/path/to/nextcloud/server/apps-extra/spreed/
      ```
 3. Check `.env.example` for any additional configuration if needed.
+=======
+Install dependencies:
+```bash
+npm ci 
+```
+
+### Advanced setup
+
+By default, Talk Desktop bundles a specific Talk frontend installed as an npm dependency.
+To develop with a different version, an unreleased branch or local version, clone it to `./spreed`:
+
+```sh
+# Clone to ./spreed
+git clone https://github.com/nextcloud/spreed
+
+# And install dependencies in spreed as well
+npm --prefix=spreed ci
+```
+
+To use local Talk from a different path, for example, a local Nextcloud server setup, set `TALK_PATH` ENV variable or edit `.env` file:
+
+```sh
+TALK_PATH=/path/to/nextcloud/server/apps-extra/spreed/
+```
+>>>>>>> upstream/main
 
 ## 🧑‍💻 Development
 

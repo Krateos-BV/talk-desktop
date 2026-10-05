@@ -1,6 +1,10 @@
 {
   "name": "talk-desktop",
+<<<<<<< HEAD
   "version": "26.9.19.0",
+=======
+  "version": "2.3.2",
+>>>>>>> upstream/main
   "private": true,
   "bugs": {
     "url": "https://github.com/Krateos-BV/talk-desktop/issues",
@@ -61,21 +65,31 @@
     "@nextcloud/files": "^4.0.0",
     "@nextcloud/l10n": "^3.4.1",
     "@nextcloud/notify_push": "^1.4.0",
+<<<<<<< HEAD
     "@nextcloud/router": "^3.1.0",
     "@nextcloud/vue": "^9.12.0",
     "@vueuse/core": "^14.4.0",
+=======
+    "@nextcloud/router": "^3.2.0",
+    "@nextcloud/vue": "^9.13.1",
+    "@vueuse/core": "^15.0.0",
+>>>>>>> upstream/main
     "core-js": "^3.50.0",
     "electron-squirrel-startup": "^1.0.1",
     "howler": "^2.2.4",
     "mri": "^1.2.0",
     "pinia": "^4.0.3",
     "semver": "^7.8.5",
+<<<<<<< HEAD
     "talk": "github:nextcloud-releases/spreed#semver:*",
+=======
+    "talk": "github:nextcloud-releases/spreed#v25.0.3",
+>>>>>>> upstream/main
     "unzip-crx-3": "^0.2.0",
     "vue": "^3.5.43",
     "vue-material-design-icons": "^5.3.1",
     "vue-router": "^5.3.1",
-    "webdav": "^5.10.0"
+    "webdav": "^5.11.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.0-alpha.10",
@@ -92,23 +106,37 @@
     "@vue/tsconfig": "^0.9.1",
     "cheerio": "^1.2.0",
     "css-loader": "^7.1.5",
+<<<<<<< HEAD
     "dotenv": "^18.0.0",
     "electron": "^44.3.0",
+=======
+    "dotenv": "^18.0.4",
+    "electron": "^44.4.5",
+>>>>>>> upstream/main
     "esbuild-loader": "^4.5.0",
-    "eslint": "^10.10.0",
+    "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "icon-gen": "^5.0.0",
     "mini-css-extract-plugin": "^2.10.2",
     "node-loader": "^2.1.0",
     "node-polyfill-webpack-plugin": "4.0.0",
+<<<<<<< HEAD
     "patch-package": "^8.0.1",
     "postcss": "8.5.23",
     "sass": "^1.104.0",
+=======
+    "postcss": "^8.5.28",
+    "sass": "^1.105.0",
+>>>>>>> upstream/main
     "sass-loader": "^17.0.1",
     "typescript": "^6.0.3",
     "vue-loader": "^17.4.2",
     "vue-tsc": "^3.3.11",
+<<<<<<< HEAD
     "webpack": "^5.111.0",
+=======
+    "webpack": "^5.111.1",
+>>>>>>> upstream/main
     "webpack-merge": "^6.0.1",
     "worker-loader": "^3.0.8",
     "zx": "^8.8.5"
@@ -128,6 +156,7 @@
     "esbuild": true,
     "sharp": true
   },
+<<<<<<< HEAD
   "desktopName": "eu.xeniacloud.talk.desktop",
   "productName": "Xenia Talk",
   "talk": {
@@ -135,4 +164,8 @@
     "beta": "v25.0.0",
     "dev": "main"
   }
+=======
+  "desktopName": "com.nextcloud.talk.desktop",
+  "productName": "Nextcloud Talk"
+>>>>>>> upstream/main
 }

@@ -21,11 +21,19 @@ OC.L10N.register(
     "Ok" : "Aceutar",
     "No" : "Non",
     "Yes" : "Sí",
+    "Stable" : "Estable",
+    "Beta" : "Beta",
     "Always" : "Siempres",
     "Never" : "Enxamás",
+    "Update channel" : "Canal d'anovamientu",
     "Theme" : "Estilu",
     "Light" : "Claridá",
     "Dark" : "Escuridá",
+<<<<<<< HEAD
+=======
+    "Accessibility" : "Accesibilidá",
+    "Dyslexia font" : "Fonte pa persones dislexiques",
+>>>>>>> upstream/main
     "Reload" : "Volver cargar",
     "Zoom" : "Zoom",
     "Zoom out" : "Alloñar",
