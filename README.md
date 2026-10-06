@@ -84,28 +84,33 @@ Examples:
 
 ## 🛠️ Development Setup
 
-1. Install dependencies
-	 ```bash
-	 npm ci 
-	 ```
-2. Xenia Talk Desktop requires [Nextcloud Talk source code](https://github.com/nextcloud/spreed) (Xenia Talk's server-side app is a Nextcloud Talk deployment).
-   - **No `nextcloud/spreed` is cloned?**\
-     Clone it and install dependencies:
-	   ```sh
-	   # Clone Talk to the repository root
-	   git clone https://github.com/nextcloud/spreed
-     
-	   # Install dependencies
-	   npm ci --prefix=spreed
-	   ```
-   - **You want to reuse existing `nextcloud/spreed`, for instance, in a server setup?**\
-     Set `TALK_PATH` ENV variable or edit `.env` file:
-     ```sh
-     cp .env.example .env
-     # Edit .env and set TALK_PATH
-     TALK_PATH=/path/to/nextcloud/server/apps-extra/spreed/
-     ```
-3. Check `.env.example` for any additional configuration if needed.
+Install dependencies:
+```bash
+npm ci
+```
+
+### Advanced setup
+
+By default, Xenia Talk Desktop bundles a specific Nextcloud Talk frontend installed as an npm dependency (Xenia Talk's server-side app is a Nextcloud Talk deployment).
+To develop with a different version, an unreleased branch or local version, clone [nextcloud/spreed](https://github.com/nextcloud/spreed) to `./spreed`:
+
+```sh
+# Clone to ./spreed
+git clone https://github.com/nextcloud/spreed
+
+# And install dependencies in spreed as well
+npm --prefix=spreed ci
+```
+
+To use local Talk from a different path, for example, a local Nextcloud server setup, set `TALK_PATH` ENV variable or edit `.env` file:
+
+```sh
+cp .env.example .env
+# Edit .env and set TALK_PATH
+TALK_PATH=/path/to/nextcloud/server/apps-extra/spreed/
+```
+
+Check `.env.example` for any additional configuration if needed.
 
 ## 🧑‍💻 Development
 
