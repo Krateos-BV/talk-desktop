@@ -58,7 +58,7 @@ function compareVersionTags(a: string, b: string): number {
  * Whether tag `a` is older than or equal to tag `b`, tolerating either
  * version shape (see compareVersionTags).
  */
-function isOlderOrEqualVersionTag(a: string, b: string): boolean {
+export function isOlderOrEqualVersionTag(a: string, b: string): boolean {
 	const bareA = a.replace(/^v/, '')
 	const bareB = b.replace(/^v/, '')
 	if (CALVER_TAG_PATTERN.test(bareA) && CALVER_TAG_PATTERN.test(bareB)) {

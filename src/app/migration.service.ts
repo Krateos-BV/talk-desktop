@@ -5,9 +5,9 @@
 
 import type { Awaitable } from '../shared/utils.types.ts'
 
-import gt from 'semver/functions/gt.js'
 import { version } from '../../package.json' with { type: 'json' }
 import { getAppConfig, setAppConfig } from './AppConfig.ts'
+import { isOlderOrEqualVersionTag } from './githubRelease.service.ts'
 import { migrations } from './migrations/migrations.ts'
 import { relaunchApp } from './system.utils.ts'
 
@@ -34,6 +34,26 @@ export type Migration = {
 let relaunchRequired = false
 
 /**
+ * Whether the running version is newer than the version the app last ran as.
+ *
+ * Must never throw: this runs inside `await runMigrations()` during startup, so a
+ * rejection here prevents the app from opening a window. This fork's CalVer version
+ * (YY.M.D.ID) is not valid semver, so `semver.gt()` throws on it, and the stored
+ * `lastAppVersion` of an older install may be a different shape again (for example
+ * a semver prerelease tag). When the two cannot be compared, treat any difference
+ * as an upgrade.
+ *
+ * @param lastAppVersion - Version the application last ran as
+ */
+function isUpgradeFrom(lastAppVersion: string): boolean {
+	try {
+		return !isOlderOrEqualVersionTag(version, lastAppVersion)
+	} catch {
+		return version !== lastAppVersion
+	}
+}
+
+/**
  * Run migration
  *
  * @param migration - Migration
@@ -42,7 +62,7 @@ async function runMigration(migration: Migration): Promise<void> {
 	const lastAppVersion = getAppConfig('lastAppVersion')
 
 	const matchesFirstStart = migration.onFirstStart && !lastAppVersion
-	const matchesUpgrade = migration.onUpgrade && lastAppVersion && gt(version, lastAppVersion)
+	const matchesUpgrade = migration.onUpgrade && lastAppVersion && isUpgradeFrom(lastAppVersion)
 	if (!matchesFirstStart && !matchesUpgrade) {
 		return
 	}
