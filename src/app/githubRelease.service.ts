@@ -9,6 +9,7 @@ import rcompare from 'semver/functions/rcompare.js'
 import valid from 'semver/functions/valid.js'
 import { version } from '../../package.json'
 import { BUILD_CONFIG } from '../shared/build.config.ts'
+import { getAppConfig, onAppConfigChange } from './AppConfig.ts'
 import { currentInstallerExt, isMac, platformTitle } from './system.utils.ts'
 
 // A plain-numeric tag with 3 or 4 dot-separated segments and no prerelease/build
@@ -189,8 +190,7 @@ export async function checkForUpdate({ forceRequest = false }: { forceRequest?: 
 		return cachedNewRelease
 	}
 
-	// Until we have the release channel in the settings, provide only the current
-	const latest = (await getLatestRelease())[__CHANNEL__ === 'stable' ? 'stable' : 'latest']
+	const latest = (await getLatestRelease())[getAppConfig('releaseChannel') === 'stable' ? 'stable' : 'latest']
 
 	// Something went wrong...
 	if (!latest) {
@@ -198,6 +198,7 @@ export async function checkForUpdate({ forceRequest = false }: { forceRequest?: 
 	}
 
 	if (isOlderOrEqualVersionTag(latest.version, version)) {
+		cachedNewRelease = null
 		return null
 	}
 
@@ -209,6 +210,8 @@ export async function checkForUpdate({ forceRequest = false }: { forceRequest?: 
 
 	return latest
 }
+
+onAppConfigChange('releaseChannel', () => checkForUpdate({ forceRequest: true }))
 
 let schedulerIntervalId: NodeJS.Timeout | undefined
 
