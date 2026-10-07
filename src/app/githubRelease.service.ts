@@ -151,9 +151,9 @@ async function getLatestRelease(): Promise<{ latest?: ReleaseInfo, stable?: Rele
 			const releases = (await response.json() as GitHubReleaseResponse[])
 				// GitHub releases may include drafts which haven't been actually released yet
 				.filter((release) => !release.draft)
-				// rcompare/lte throw on a tag that isn't semver, and a throw here is swallowed
-				// by the catch below - so one stray tag (say, "latest") in the release
-				// repository would silently disable update checks for every client.
+				// Keep a tag that is not a version at all (say, "latest") out of the candidates,
+				// so it can never be picked as the newest release. compareVersionTags() cannot
+				// throw on such a tag, but it would still have to put it somewhere in the order.
 				.filter((release) => isValidVersionTag(release.tag_name))
 				// GitHub releases are ordered by date (ID), but we need the latest by semantic version
 				.sort((a, b) => compareVersionTags(a.tag_name, b.tag_name))

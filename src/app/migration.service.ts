@@ -38,10 +38,12 @@ let relaunchRequired = false
  *
  * Must never throw: this runs inside `await runMigrations()` during startup, so a
  * rejection here prevents the app from opening a window. This fork's CalVer version
- * (YY.M.D.ID) is not valid semver, so `semver.gt()` throws on it, and the stored
- * `lastAppVersion` of an older install may be a different shape again (for example
- * a semver prerelease tag). When the two cannot be compared, treat any difference
- * as an upgrade.
+ * (YY.M.D.ID) is not valid semver, which is why this uses isOlderOrEqualVersionTag()
+ * and not `semver.gt()`, which throws on it. The stored `lastAppVersion` of an older
+ * install may be a different shape again (for example a semver prerelease tag);
+ * isOlderOrEqualVersionTag() orders such pairs by shape instead of throwing. The
+ * try/catch is kept as defence in depth: if the comparison ever does fail, treat any
+ * difference as an upgrade.
  *
  * @param lastAppVersion - Version the application last ran as
  */
