@@ -141,6 +141,8 @@ async function getLatestRelease(): Promise<{ latest?: ReleaseInfo, stable?: Rele
 		})
 
 		if (!response.ok) {
+			// Without this a rate limit (403) or an outage looks exactly like "no update available"
+			console.error(`Update check failed: ${BUILD_CONFIG.updateRepository} releases request returned HTTP ${response.status}`)
 			return {
 				latest: undefined,
 				stable: undefined,
@@ -158,13 +160,17 @@ async function getLatestRelease(): Promise<{ latest?: ReleaseInfo, stable?: Rele
 				// GitHub releases are ordered by date (ID), but we need the latest by semantic version
 				.sort((a, b) => compareVersionTags(a.tag_name, b.tag_name))
 
+			if (releases.length === 0) {
+				console.warn(`Update check found no usable release tag in ${BUILD_CONFIG.updateRepository}`)
+			}
+
 			return {
 				latest: mapGitHubReleaseToReleaseInfo(releases[0]),
 				stable: mapGitHubReleaseToReleaseInfo(releases.find((release) => !release.prerelease)),
 			}
 		}
 	} catch (e) {
-		console.error(e)
+		console.error('Update check failed:', e)
 	}
 
 	return {
