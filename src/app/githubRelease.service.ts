@@ -4,7 +4,6 @@
  */
 
 import { BrowserWindow } from 'electron'
-import lte from 'semver/functions/lte.js'
 import rcompare from 'semver/functions/rcompare.js'
 import valid from 'semver/functions/valid.js'
 import { version } from '../../package.json'
@@ -30,17 +29,29 @@ function isValidVersionTag(tag: string): boolean {
 }
 
 /**
- * Compare two (possibly "v"-prefixed) version tags for descending sort/lte.
- * Plain-numeric CalVer tags (3 or 4 segments, no suffix) compare as numeric
- * tuples - this also covers this fork's older 3-segment tags, and produces
- * the same ordering semver itself would for a non-prerelease X.Y.Z tag, so
- * it's a safe generalization rather than a behavior change for those.
- * Anything else (a real semver prerelease/build tag) falls back to semver.
+ * Compare two (possibly "v"-prefixed) version tags, as a comparator for a DESCENDING
+ * sort: negative when `a` is newer than `b`.
+ *
+ * Never throws, whatever the shapes of the two tags. This runs inside the update
+ * checker, where a throw is swallowed and silently switches update checks off for
+ * every client, so every pair needs a defined answer:
+ * - Two plain-numeric tags (3 or 4 segments, no suffix; this fork's CalVer, and the
+ *   older 3-segment tags) compare as numeric tuples. For a non-prerelease X.Y.Z tag
+ *   this is the same ordering semver itself would give.
+ * - Two valid semver tags (a prerelease/build suffix, for upstream-style repositories)
+ *   compare with semver.
+ * - Any other pair has no common scheme, for example a four-segment CalVer tag against
+ *   a semver prerelease tag (`semver.rcompare` throws on the CalVer tag), or a tag that
+ *   is neither. These are ordered by shape instead: CalVer, then valid semver, then
+ *   anything else. Mixed repositories are not expected; this only guarantees a
+ *   deterministic answer instead of an exception.
  */
 function compareVersionTags(a: string, b: string): number {
 	const bareA = a.replace(/^v/, '')
 	const bareB = b.replace(/^v/, '')
-	if (CALVER_TAG_PATTERN.test(bareA) && CALVER_TAG_PATTERN.test(bareB)) {
+	const isCalVerA = CALVER_TAG_PATTERN.test(bareA)
+	const isCalVerB = CALVER_TAG_PATTERN.test(bareB)
+	if (isCalVerA && isCalVerB) {
 		const partsA = bareA.split('.').map(Number)
 		const partsB = bareB.split('.').map(Number)
 		for (let i = 0; i < 4; i++) {
@@ -51,20 +62,22 @@ function compareVersionTags(a: string, b: string): number {
 		}
 		return 0
 	}
-	return rcompare(bareA, bareB)
+
+	const isSemverA = valid(bareA) !== null
+	const isSemverB = valid(bareB) !== null
+	if (isSemverA && isSemverB) {
+		return rcompare(bareA, bareB)
+	}
+
+	const shapeRank = (isCalVer: boolean, isSemver: boolean) => isCalVer ? 2 : (isSemver ? 1 : 0)
+	return shapeRank(isCalVerB, isSemverB) - shapeRank(isCalVerA, isSemverA)
 }
 
 /**
- * Whether tag `a` is older than or equal to tag `b`, tolerating either
- * version shape (see compareVersionTags).
+ * Whether tag `a` is older than or equal to tag `b`. Never throws (see compareVersionTags).
  */
 export function isOlderOrEqualVersionTag(a: string, b: string): boolean {
-	const bareA = a.replace(/^v/, '')
-	const bareB = b.replace(/^v/, '')
-	if (CALVER_TAG_PATTERN.test(bareA) && CALVER_TAG_PATTERN.test(bareB)) {
-		return compareVersionTags(a, b) >= 0
-	}
-	return lte(bareA, bareB)
+	return compareVersionTags(a, b) >= 0
 }
 
 export type ReleaseInfo = {
@@ -138,9 +151,9 @@ async function getLatestRelease(): Promise<{ latest?: ReleaseInfo, stable?: Rele
 			const releases = (await response.json() as GitHubReleaseResponse[])
 				// GitHub releases may include drafts which haven't been actually released yet
 				.filter((release) => !release.draft)
-				// rcompare/lte throw on a tag that isn't semver, and a throw here is swallowed
-				// by the catch below - so one stray tag (say, "latest") in the release
-				// repository would silently disable update checks for every client.
+				// Keep a tag that is not a version at all (say, "latest") out of the candidates,
+				// so it can never be picked as the newest release. compareVersionTags() cannot
+				// throw on such a tag, but it would still have to put it somewhere in the order.
 				.filter((release) => isValidVersionTag(release.tag_name))
 				// GitHub releases are ordered by date (ID), but we need the latest by semantic version
 				.sort((a, b) => compareVersionTags(a.tag_name, b.tag_name))
