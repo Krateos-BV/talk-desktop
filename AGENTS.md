@@ -10,7 +10,8 @@
 > `nextcloud/talk-desktop`. In this fork, work is reviewed on the pull request
 > itself rather than before it is opened, so the agent opens its own PRs and
 > writes their descriptions (see "What this agent may do in this fork"). Every
-> other rule below stands unchanged. **This amendment applies only to pull
+> other rule below stands unchanged, except the model-version part of the
+> `Assisted-by` trailer (same section). **This amendment applies only to pull
 > requests targeting branches of `Krateos-BV/talk-desktop`.** Anything destined
 > for an upstream `nextcloud/*` repository follows the unmodified upstream
 > policy, where a human opens the PR and writes it in their own words.
@@ -47,3 +48,8 @@ All contributions generated or assisted by this agent must fully comply with:
   not, so the reviewer can tell evidence from assertion.
 - This does not relax the DCO rule above. The agent still never adds
   `Signed-off-by` - only the human contributor can certify it.
+- Commit trailers in this fork: `Assisted-by: AGENT_NAME` (for example
+  `Assisted-by: Claude Code`) satisfies the `Assisted-by` rule above; the
+  `MODEL_VERSION` part is not required here. Anything destined for an upstream
+  `nextcloud/*` repository keeps the full `AGENT_NAME:MODEL_VERSION` form, written
+  by the human who opens it.
