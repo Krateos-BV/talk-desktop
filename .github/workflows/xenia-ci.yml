@@ -173,7 +173,7 @@ jobs:
           echo "--- notarisation ticket ---"; xcrun stapler validate "$APP" 2>&1 | tail -5 || true
 
       # Makes every darwin distributable from the bundle built above
-      # (--skip-package reuses it): .zip and .dmg.
+      # (--from-package reuses it): .zip and .dmg.
       - name: Make macOS .zip and .dmg
         env:
           TALK_PATH: out/.temp/spreed
