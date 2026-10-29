@@ -48,8 +48,18 @@ All contributions generated or assisted by this agent must fully comply with:
   not, so the reviewer can tell evidence from assertion.
 - This does not relax the DCO rule above. The agent still never adds
   `Signed-off-by` - only the human contributor can certify it.
-- Commit trailers in this fork: `Assisted-by: AGENT_NAME` (for example
-  `Assisted-by: Claude Code`) satisfies the `Assisted-by` rule above; the
-  `MODEL_VERSION` part is not required here. Anything destined for an upstream
-  `nextcloud/*` repository keeps the full `AGENT_NAME:MODEL_VERSION` form, written
-  by the human who opens it.
+- Commit trailers in this fork (one convention shared by `Krateos-BV/talk-desktop`
+  and `Krateos-BV/files-desktop`). Every commit containing AI-assisted content
+  carries:
+  - `Assisted-by: Claude Code` - required. `AGENT_NAME` is spelled exactly
+    `Claude Code`. Append `:MODEL_VERSION` (`Assisted-by: Claude Code:<model-id>`)
+    only when the session is allowed to write a model identifier into commits.
+    Some agent sessions are not, and for them the trailer without a version is
+    complete, not a breach of the `Assisted-by` rule above.
+  - `Claude-Session: <session URL>` when the session has one. It identifies the
+    session that wrote the commit, which is where the model can be looked up
+    when the commit does not name it.
+  - `Refs: <JIRA-KEY>` when the work has a ticket.
+
+  A `Co-Authored-By` line added by the tool may stay, but it does not replace
+  `Assisted-by`. The agent still never adds `Signed-off-by` (DCO rule above).
