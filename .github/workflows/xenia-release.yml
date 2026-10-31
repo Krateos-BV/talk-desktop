@@ -118,6 +118,15 @@ jobs:
         env:
           APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
           APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          # The check below tests all five keys, so all five must be mapped here.
+          # Mapping only the two certificate secrets made this step report the three
+          # notarisation keys as unresolved and skip the keychain import, while the
+          # build step (which does map them) still turned signing on: the result was
+          # an ad-hoc signed bundle that failed notarisation (run 41077186181,
+          # v26.10.29.0).
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
 
@@ -190,6 +199,19 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run build:mac
+
+      # Proves the artifact really is signed and notarised, rather than trusting that
+      # the build step did not quietly skip it. Ported from xenia-ci.yml. Reports
+      # only, never fails the job: `xcrun stapler validate` is what tells "signed"
+      # apart from "signed AND notarised".
+      - name: Verify signature and notarisation
+        if: always() && steps.signing.outputs.signed == 'true'
+        run: |
+          APP="out/Xenia Talk-darwin-universal/Xenia Talk.app"
+          echo "--- codesign ---";      codesign -dv --verbose=4 "$APP" 2>&1 | head -20 || true
+          echo "--- strict verify ---"; codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | tail -5 || true
+          echo "--- Gatekeeper ---";    spctl -a -vvv -t exec "$APP" 2>&1 | tail -5 || true
+          echo "--- notarisation ticket ---"; xcrun stapler validate "$APP" 2>&1 | tail -5 || true
 
       # Builds every darwin distributable: .zip and .dmg. The DMG maker used to fail on
       # Node 23+ (appdmg -> macos-alias util.isDate); fixed by patch-package (XNT-80).
