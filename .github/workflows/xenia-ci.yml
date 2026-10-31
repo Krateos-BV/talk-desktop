@@ -255,6 +255,53 @@ jobs:
           npm run build:linux
           npm run package:linux
 
+      # XEN-214: an explicit --user-data-dir must win over the default profile path,
+      # so an isolated launch gets its own profile and its own single instance lock
+      # instead of using (and quitting) the installed app. Launches the packaged app
+      # under Xvfb and checks where Chromium writes "Local State". --no-sandbox only
+      # because the unpacked chrome-sandbox is not setuid on the runner.
+      - name: Verify --user-data-dir isolates the profile
+        run: |
+          command -v xvfb-run >/dev/null || { sudo apt-get update && sudo apt-get install -y xvfb; }
+          cat > "$RUNNER_TEMP/udd-test.sh" <<'EOF'
+          set -uo pipefail
+          EXE="$PWD/out/Xenia Talk-linux-x64/Xenia Talk"
+          T=$(mktemp -d)
+          export HOME="$T/home" XDG_CONFIG_HOME="$T/home/.config"
+          mkdir -p "$HOME"
+          DEFAULT="$XDG_CONFIG_HOME/Xenia Talk"
+          ISO="$T/isolated"
+          fail=0
+          check() { if eval "$2"; then echo "PASS: $1"; else echo "::error::FAIL: $1"; fail=1; fi; }
+          alive() { kill -0 "$1" 2>/dev/null; }
+
+          "$EXE" --no-sandbox --user-data-dir="$ISO" >"$T/iso1.log" 2>&1 & ISO1=$!
+          sleep 20
+          check "isolated launch writes Local State to the given dir" '[ -f "$ISO/Local State" ]'
+          check "isolated launch leaves the default profile untouched" '[ ! -e "$DEFAULT" ]'
+          kill $ISO1; wait $ISO1 2>/dev/null
+
+          "$EXE" --no-sandbox >"$T/default.log" 2>&1 & DEF=$!
+          sleep 20
+          check "default launch uses the default profile" '[ -f "$DEFAULT/Local State" ]'
+          "$EXE" --no-sandbox --user-data-dir="$ISO" >"$T/iso2.log" 2>&1 & ISO2=$!
+          sleep 20
+          check "isolated instance runs next to the default one" 'alive $ISO2'
+          check "default instance still running after isolated launch" 'alive $DEF'
+
+          "$EXE" --no-sandbox >"$T/default2.log" 2>&1 & DEF2=$!
+          sleep 15
+          check "second default launch exits (single instance lock kept)" '! alive $DEF2'
+          check "first default instance still running" 'alive $DEF'
+
+          kill $DEF $ISO2 $DEF2 2>/dev/null; wait 2>/dev/null
+          if [ $fail -ne 0 ]; then
+            for log in "$T"/*.log; do echo "--- $log"; cat "$log"; done
+          fi
+          exit $fail
+          EOF
+          xvfb-run -a bash "$RUNNER_TEMP/udd-test.sh"
+
       # Belt and braces: forge throws if a maker is unsupported, but it cannot tell
       # us the .flatpak actually landed in out/make (postMake renames artifacts).
       # Assert it exists so an empty upload cannot pass as a green check.
