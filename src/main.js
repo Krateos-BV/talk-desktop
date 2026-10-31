@@ -40,7 +40,10 @@ const argv = mri(process.argv.slice(app.isPackaged ? 1 : 2))
  */
 const APP_NAME = process.env.NODE_ENV !== 'development' ? path.parse(app.getPath('exe')).name : `${BUILD_CONFIG.applicationName} (dev)`
 app.setName(APP_NAME)
-app.setPath('userData', path.join(app.getPath('appData'), app.getName()))
+// An explicit --user-data-dir is already applied by Electron, keep it to allow isolated instances with their own profile and single instance lock
+if (!app.commandLine.hasSwitch('user-data-dir')) {
+	app.setPath('userData', path.join(app.getPath('appData'), app.getName()))
+}
 if (isWindows && process.env.NODE_ENV === 'production') {
 	if (isSquirrel) {
 		// Squirrel.Windows sets the AppUserModelId in the following way
