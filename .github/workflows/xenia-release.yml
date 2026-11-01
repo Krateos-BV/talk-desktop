@@ -222,6 +222,18 @@ jobs:
           TALK_PATH: out/.temp/spreed
         run: npm run package:mac
 
+      # MakerDMG wraps the signed .app but leaves the .dmg container itself unsigned
+      # and unstapled. Sign, notarise and staple it, then verify both the .dmg and the
+      # app inside it. Runs only on a signed build, and fails the job on any error:
+      # a signed build must not ship an unsigned .dmg.
+      - name: Sign, notarise and verify the .dmg
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: .github/scripts/sign-notarize-dmg.sh
+
       - uses: actions/upload-artifact@v4
         with:
           name: release-macos
