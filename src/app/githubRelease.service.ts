@@ -164,9 +164,16 @@ async function getLatestRelease(): Promise<{ latest?: ReleaseInfo, stable?: Rele
 				console.warn(`Update check found no usable release tag in ${BUILD_CONFIG.updateRepository}`)
 			}
 
+			const stableRelease = releases.find((release) => !release.prerelease)
+
+			// Without this, a list of prereleases only looks exactly like "already on the latest" on the stable channel
+			if (releases.length > 0 && !stableRelease) {
+				console.warn(`Update check found only prereleases in ${BUILD_CONFIG.updateRepository}, so the stable channel has no release`)
+			}
+
 			return {
 				latest: mapGitHubReleaseToReleaseInfo(releases[0]),
-				stable: mapGitHubReleaseToReleaseInfo(releases.find((release) => !release.prerelease)),
+				stable: mapGitHubReleaseToReleaseInfo(stableRelease),
 			}
 		}
 	} catch (e) {
