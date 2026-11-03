@@ -11,8 +11,8 @@ name: Xenia macOS queue retry
 # It re-runs the failed jobs of a watched run only when ALL of these hold:
 #   - the run concluded cancelled or failure;
 #   - at least one macOS job was cancelled with no runner and no steps after
-#     sitting in the queue for 14 to 30 minutes (queue starvation; the cut-offs
-#     seen so far were 901 to 1721 s, so a human cancel outside that window is
+#     sitting in the queue for 14 to 60 minutes (queue starvation; the cut-offs
+#     seen so far were 901 to 2915 s, so a human cancel outside that window is
 #     left alone);
 #   - no other job failed, timed out, or was cancelled after it got a runner
 #     (so a real failure or a human cancel is never retried);
@@ -60,7 +60,7 @@ jobs:
       RUN_EVENT: ${{ github.event.workflow_run.event }}
       MAX_ATTEMPTS: '3'
       MIN_QUEUED_SECONDS: '840'
-      MAX_QUEUED_SECONDS: '1800'
+      MAX_QUEUED_SECONDS: '3600'
     steps:
       - name: Re-run macOS jobs that never got a runner
         shell: bash
@@ -99,7 +99,7 @@ jobs:
           blocking="$(jq -r '.blocking | join(", ")' <<<"${verdict}")"
 
           if [ -z "${starved}" ]; then
-            note "Skip: no macOS job matches a queue cut-off (cancelled, never ran, 840 to 1800 s queued)."
+            note "Skip: no macOS job matches a queue cut-off (cancelled, never ran, 840 to 3600 s queued)."
             exit 0
           fi
           if [ -n "${blocking}" ]; then
