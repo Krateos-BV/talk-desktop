@@ -61,7 +61,7 @@ jobs:
           {
             printf 'runs-on: [%s, macOS]\n' "$sh_label"
             printf 'runs-on: %s\n' "$mm_label"
-            printf 'runs-on: ${{ vars.%s }}\n' "$var_name"
+            printf 'runs-on: fromJSON(vars.%s)\n' "$var_name"
           } > "$canary/sample.yml"
           found=$(grep -c -i -E "$pattern" "$canary/sample.yml" || true)
           rm -rf "$canary"
