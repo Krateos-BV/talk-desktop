@@ -1,0 +1,114 @@
+# SPDX-FileCopyrightText: 2026 XeniaCloud
+# SPDX-License-Identifier: MIT
+
+name: Self-hosted Runner Guard
+
+# Fails any pull request, or any push to main, that adds a workflow able to
+# target a self-hosted runner outside the Xenia allow-list.
+#
+# Why this exists (XEN-325 / XEN-326): trusted macOS jobs can run on the Mac
+# Mini, which also holds signing identities and 1Password. The runner group
+# only accepts selected workflows at refs/heads/main, so this guard is the
+# second line: it stops a new workflow, or one arriving from an upstream sync
+# (upstream syncs bring workflows in enabled), from quietly asking for a
+# self-hosted runner. Only xenia-ci.yml may reference the runner variable.
+#
+# Cheap and independent: no SDK, no secrets, hosted Ubuntu runner.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-hosted-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self-hosted-guard:
+    name: self-hosted-guard
+    # Must be a real hosted label (see xenia-conflict-marker-guard.yml on the
+    # dead ubuntu-latest-low label). Never point this job at the Mac Mini.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Scan workflows for self-hosted runner use
+        run: |
+          set -euo pipefail
+
+          # Built at runtime so this file does not match its own scan.
+          sh_label="self""-hosted"
+          mm_label="xenia""-mac-mini"
+          var_name="XENIA""_MACOS_RUNNER"
+          pattern="($sh_label|$mm_label|$var_name)"
+
+          # Files allowed to reference the runner variable. Nothing may name
+          # the self-hosted labels literally; they live only in the variable.
+          allowed_var_files=".github/workflows/xenia-ci.yml"
+
+          # Canary: prove the pattern matches before trusting a clean result.
+          canary=$(mktemp -d)
+          {
+            printf 'runs-on: [%s, macOS]\n' "$sh_label"
+            printf 'runs-on: %s\n' "$mm_label"
+            printf 'runs-on: fromJSON(vars.%s)\n' "$var_name"
+          } > "$canary/sample.yml"
+          found=$(grep -c -i -E "$pattern" "$canary/sample.yml" || true)
+          rm -rf "$canary"
+          if [ "$found" != "3" ]; then
+            echo "::error::Self-test failed: matched '$found' of 3 synthetic lines. Fix the guard rather than ignoring this run."
+            exit 1
+          fi
+          echo "Pattern self-test OK (3/3)."
+
+          set +e
+          # This file is excluded (its own names say what it guards), and
+          # comment-only lines are ignored below: only YAML that runs counts.
+          git grep --cached -n -i -E "$pattern" -- '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+            ':(exclude).github/workflows/xenia-self-hosted-guard.yml' > hits.txt 2> err.txt
+          rc=$?
+          set -e
+          if [ "$rc" -gt 1 ]; then
+            echo "::error::Scan did not run (git grep exit $rc); treating as failure."
+            cat err.txt
+            exit 1
+          fi
+
+          bad=0
+          while IFS= read -r hit; do
+            [ -z "$hit" ] && continue
+            file=${hit%%:*}
+            rest=${hit#*:}
+            line=${rest%%:*}
+            text=${rest#*:}
+            if printf '%s' "$text" | grep -q -E '^[[:space:]]*#'; then
+              continue
+            fi
+            ok=0
+            for f in $allowed_var_files; do
+              # The allowed file may name the variable, but never a label literally.
+              if [ "$file" = "$f" ] && ! printf '%s' "$text" | grep -q -i -E "($sh_label|$mm_label)"; then
+                ok=1
+              fi
+            done
+            if [ "$ok" = 0 ]; then
+              echo "::error file=$file,line=$line::Self-hosted runner reference outside the allow-list"
+              bad=$((bad+1))
+            fi
+          done < hits.txt
+
+          if [ "$bad" -gt 0 ]; then
+            echo "::error::$bad self-hosted runner reference(s) outside the allow-list (XEN-325). Only xenia-ci.yml may use the runner variable."
+            exit 1
+          fi
+          echo "No self-hosted runner use outside the allow-list."
