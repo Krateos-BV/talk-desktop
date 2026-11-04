@@ -1,0 +1,120 @@
+# SPDX-FileCopyrightText: 2026 XeniaCloud
+# SPDX-License-Identifier: MIT
+
+name: Xenia macOS queue retry
+#
+# GitHub-hosted macOS jobs are sometimes cancelled while still queued: no runner
+# is ever assigned, the job has no steps, and GitHub ends it as "cancelled"
+# about 15 minutes after it was queued (XEN-314). Pressing "Re-run failed jobs"
+# usually gets a machine. This workflow does that press for us, and only then.
+#
+# It re-runs the failed jobs of a watched run only when ALL of these hold:
+#   - the run concluded cancelled or failure;
+#   - at least one macOS job was cancelled with no runner and no steps after
+#     sitting in the queue for 14 to 60 minutes (queue starvation; the cut-offs
+#     seen so far were 901 to 2915 s, so a human cancel outside that window is
+#     left alone);
+#   - no other job failed, timed out, or was cancelled after it got a runner
+#     (so a real failure or a human cancel is never retried);
+#   - the run is below attempt 3 (at most two automatic re-runs);
+#   - it is still the newest run of that workflow for its branch or tag and
+#     its triggering event.
+#
+# Release workflows are watched too. A re-run executes their existing jobs,
+# signing included, exactly as a manual re-run would; nothing here signs.
+#
+# Safety: workflow_run always runs this file from the default branch. It checks
+# out no code and runs no third-party action; it only calls the GitHub API with
+# this job's token. Values from the triggering run reach the script through
+# env, never through ${{ }} inside the script.
+#
+# Rollback: disable this workflow in the Actions tab, or revert the PR.
+
+on:
+  workflow_run:
+    workflows:
+      - 'Xenia CI (unsigned build)'
+      - 'Xenia Release'
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  retry:
+    if: >-
+      github.event.workflow_run.conclusion == 'cancelled' ||
+      github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+      RUN_NAME: ${{ github.event.workflow_run.name }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      RUN_EVENT: ${{ github.event.workflow_run.event }}
+      MAX_ATTEMPTS: '3'
+      MIN_QUEUED_SECONDS: '840'
+      MAX_QUEUED_SECONDS: '3600'
+    steps:
+      - name: Re-run macOS jobs that never got a runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          note() { echo "$1"; echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+          note "Run: [${RUN_NAME} #${RUN_ID} attempt ${RUN_ATTEMPT}](${RUN_URL})"
+
+          if [ "${RUN_ATTEMPT}" -ge "${MAX_ATTEMPTS}" ]; then
+            note "Skip: attempt ${RUN_ATTEMPT} has reached the cap of ${MAX_ATTEMPTS}."
+            exit 0
+          fi
+
+          jobs="$(gh api --paginate \
+            "repos/${REPO}/actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[]' | jq -s '.')"
+
+          # starved: cancelled macOS job that never got a runner or a step and
+          #          sat in the queue for as long as GitHub's cut-off takes.
+          # blocking: anything that means a retry would be wrong.
+          verdict="$(jq -c --argjson min "${MIN_QUEUED_SECONDS}" --argjson max "${MAX_QUEUED_SECONDS}" '
+            def never_ran: ((.runner_id // 0) == 0) and ((.steps // []) | length == 0);
+            def queued_s: ((.completed_at | fromdateiso8601) - (.created_at | fromdateiso8601));
+            def macos: any(.labels[]?; test("^macos"; "i"));
+            def starved: .conclusion == "cancelled" and never_ran and macos and queued_s >= $min and queued_s <= $max;
+            {
+              starved:  [ .[] | select(starved) | .name ],
+              blocking: [ .[] | select(
+                            (.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure")
+                            or (.conclusion == "cancelled" and (starved | not))
+                          ) | "\(.name) (\(.conclusion))" ]
+            }' <<<"${jobs}")"
+
+          starved="$(jq -r '.starved | join(", ")' <<<"${verdict}")"
+          blocking="$(jq -r '.blocking | join(", ")' <<<"${verdict}")"
+
+          if [ -z "${starved}" ]; then
+            note "Skip: no macOS job matches a queue cut-off (cancelled, never ran, 840 to 3600 s queued)."
+            exit 0
+          fi
+          if [ -n "${blocking}" ]; then
+            note "Skip: queue-starved (${starved}), but other jobs need a human: ${blocking}."
+            exit 0
+          fi
+
+          newest="$(gh api \
+            "repos/${REPO}/actions/workflows/${WORKFLOW_ID}/runs?per_page=1" \
+            -f branch="${HEAD_BRANCH}" -f event="${RUN_EVENT}" -X GET --jq '.workflow_runs[0].id // empty')"
+          if [ -n "${newest}" ] && [ "${newest}" != "${RUN_ID}" ]; then
+            note "Skip: run ${newest} is newer for ${HEAD_BRANCH} (${RUN_EVENT}); not reviving a superseded run."
+            exit 0
+          fi
+
+          note "Re-run: queue-starved macOS job(s): ${starved}."
+          gh api -X POST "repos/${REPO}/actions/runs/${RUN_ID}/rerun-failed-jobs" --silent
+          note "Requested attempt $((RUN_ATTEMPT + 1))."
