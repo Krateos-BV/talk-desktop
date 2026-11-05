@@ -36,6 +36,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege for the job token (XEN-326 QA): the jobs only check out code and
+# upload artifacts. This matters more now that build-macos can run on the self-hosted
+# Mac Mini runner.
+permissions:
+  contents: read
+
 jobs:
   build-windows:
     runs-on: windows-latest
