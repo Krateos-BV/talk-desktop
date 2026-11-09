@@ -199,6 +199,7 @@ let cachedNewRelease: ReleaseInfo | null = null
  * @return true if there is a new version
  */
 export async function checkForUpdate({ forceRequest = false }: { forceRequest?: boolean } = {}): Promise<ReleaseInfo | null> {
+<<<<<<< HEAD
 	// Every build checks its OWN release channel, configured as BUILD_CONFIG.updateRepository:
 	// upstream builds check nextcloud-releases/talk-desktop, the Xenia build checks this fork.
 	// This replaces the blanket isBranded guard added for XNT-77, which existed only because a
@@ -209,6 +210,9 @@ export async function checkForUpdate({ forceRequest = false }: { forceRequest?: 
 	// Guarding here covers every caller - including the renderer's main menu, which calls this
 	// directly on every mount and never went through the scheduler's own !isBranded gate.
 	if (!BUILD_CONFIG.updateRepository) {
+=======
+	if (getAppConfig('skipUpdateCheck')) {
+>>>>>>> upstream/main
 		return null
 	}
 
@@ -249,6 +253,14 @@ let schedulerIntervalId: NodeJS.Timeout | undefined
 export function setupReleaseNotificationScheduler(intervalInMin: number = 60) {
 	if (schedulerIntervalId !== undefined) {
 		stopReleaseNotificationScheduler()
+	}
+
+	if (process.env.NODE_ENV !== 'production') {
+		return
+	}
+
+	if (getAppConfig('skipUpdateCheck')) {
+		return
 	}
 
 	checkForUpdate()
