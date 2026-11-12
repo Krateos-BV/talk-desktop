@@ -42,6 +42,12 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels its older run, so the two Mac Mini slots
+# are not spent on outdated commits. Pushes to main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -83,16 +89,14 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    # Push-to-main builds may run on the Mac Mini runner (XEN-325 / XEN-326).
-    # The repo variable XENIA_MACOS_RUNNER holds the label list as JSON, e.g.
-    # ["self-hosted","xenia-mac-mini"]. Unset or empty means GitHub-hosted, so
+    # Runs on the Mac Mini runners (XEN-325 / XEN-326; all macOS CI on the Minis,
+    # 12 Nov 2026) when the repo variable XENIA_MACOS_RUNNER is set (JSON label list,
+    # e.g. ["self-hosted","xenia-mac-mini"]). Unset or empty means GitHub-hosted, so
     # deleting the variable is the rollback, no code change needed.
-    # Only `push` to main is moved: pull_request stays hosted (fork PRs must never
-    # reach the Mac Mini), and workflow_dispatch stays hosted because that run
-    # signs, which is phase 2 and its own ticket. Editing this expression in a
-    # fork PR does not get a fork onto the runner: the xenia-mac-mini runner
-    # group only accepts this workflow at refs/heads/main.
-    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.XENIA_MACOS_RUNNER != '') && fromJSON(vars.XENIA_MACOS_RUNNER) || 'macos-latest' }}
+    # Moved: push to main and pull requests from branches of this repo. Pull requests
+    # from forks stay hosted, and workflow_dispatch stays hosted because that run signs
+    # (Talk half of XEN-328, its own change).
+    runs-on: ${{ (vars.XENIA_MACOS_RUNNER != '' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))) && fromJSON(vars.XENIA_MACOS_RUNNER) || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v4
 
