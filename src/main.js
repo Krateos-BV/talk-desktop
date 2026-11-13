@@ -134,6 +134,7 @@ app.whenReady().then(async () => {
 	applyTheme()
 	initLaunchAtStartupListener()
 	registerAppProtocolHandler()
+<<<<<<< HEAD
 
 	/**
 	 * Schedule check for a new version available to download from GitHub.
@@ -144,6 +145,9 @@ app.whenReady().then(async () => {
 	if (process.env.NODE_ENV === 'production') {
 		setupReleaseNotificationScheduler(24 * 60)
 	}
+=======
+	setupReleaseNotificationScheduler(24 * 60)
+>>>>>>> upstream/main
 
 	// Open in the background if it is explicitly set, or the app was open at login on macOS
 	const openInBackground = argv.background || app.getLoginItemSettings().wasOpenedAtLogin
@@ -302,6 +306,7 @@ app.whenReady().then(async () => {
 		if (createMainWindow === createTalkWindow) {
 			appData.reset()
 			await mainWindow.webContents.session.clearStorageData()
+			await mainWindow.webContents.session.clearCache()
 			app.setBadgeCount(0)
 			const authenticationWindow = createAuthenticationWindow()
 			createMainWindow = createAuthenticationWindow
