@@ -13,6 +13,14 @@ name: Xenia Upstream Sync
 # If the merge attempt below hits conflicts, the PR is still opened with the conflict
 # markers committed as-is so the diff shows exactly what needs manual resolution,
 # rather than silently skipping the sync.
+#
+# Drift alarm (XEN-387): an open sync PR is never overwritten, so before this alarm a
+# conflicted PR could sit for weeks while every weekly run finished green with only a
+# notice (PR #55, opened 9 Nov, still open on 18 Nov at 107 commits behind). The last
+# step now fails the run, which GitHub emails, when the open sync PR is older than
+# DRIFT_MAX_PR_AGE_DAYS, still has conflicts, or main is more than
+# DRIFT_MAX_BEHIND upstream commits behind. Android (XEN-313) and iOS (XEN-308)
+# have the same alarm.
 
 on:
   schedule:
@@ -28,6 +36,11 @@ on:
 permissions:
   contents: write
   pull-requests: write
+
+env:
+  # Drift alarm thresholds (XEN-387, plan XEN-385 section 4A).
+  DRIFT_MAX_PR_AGE_DAYS: 7
+  DRIFT_MAX_BEHIND: 60
 
 jobs:
   upstream-sync:
@@ -69,6 +82,7 @@ jobs:
         run: |
           count=$(git rev-list --count HEAD..upstream/main)
           echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "main=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "$count new upstream commit(s)"
 
       # --repo is load-bearing. Without it gh resolves the repository from the git remotes
@@ -107,12 +121,37 @@ jobs:
           # Base tip the sync branch is cut from, for the commit list below.
           echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git checkout -b upstream-sync/main
-          if git merge upstream/main --no-edit; then
+
+          # Upstream workflow files it adds or changes, listed in the PR body because
+          # they are left out of the merge below.
+          dropped=$(git diff --no-renames --name-status HEAD...upstream/main -- .github/workflows/ | sed 's/^/- /')
+          {
+            echo "dropped<<EOF"
+            echo "$dropped"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          merge_ok=true
+          git merge --no-commit --no-ff upstream/main || merge_ok=false
+
+          # Upstream's changes under .github/workflows/ are discarded, in the clean and
+          # the conflicted case alike, so this fork's CI is not replaced by upstream's
+          # and upstream workflows do not land enabled here (files-desktop's sync has
+          # always done this; XEN-387). Our own workflows are restored exactly as main
+          # has them, and files upstream added there are removed.
+          git checkout --no-overlay HEAD -- .github/workflows/
+          git add -A
+
+          if [ "$merge_ok" = true ]; then
             echo "clean=true" >> "$GITHUB_OUTPUT"
+            git commit --no-edit
           else
             echo "clean=false" >> "$GITHUB_OUTPUT"
-            git add -A
             git commit -m "chore: merge nextcloud/talk-desktop main (conflicts need manual resolution)"
+          fi
+          if [ -n "$(git diff --name-only HEAD^1 HEAD -- .github/workflows/)" ]; then
+            echo "::error::The sync merge still changes .github/workflows/; it must not."
+            exit 1
           fi
 
       - name: List upstream commits
@@ -159,6 +198,7 @@ jobs:
           UPSTREAM_COUNT: ${{ steps.check.outputs.count }}
           UPSTREAM_LOG: ${{ steps.log.outputs.log }}
           MERGE_CLEAN: ${{ steps.merge.outputs.clean }}
+          DROPPED_WORKFLOWS: ${{ steps.merge.outputs.dropped }}
         run: |
           status_line="This merge was clean."
           # A code fence keeps upstream commit subjects inert: an @mention or an
@@ -169,6 +209,9 @@ jobs:
           if [ "$MERGE_CLEAN" != "true" ]; then
             status_line="**This merge has unresolved conflicts** (committed as-is with conflict markers) - resolve them on this branch before merging."
           fi
+          if [ -z "$DROPPED_WORKFLOWS" ]; then
+            DROPPED_WORKFLOWS="(none)"
+          fi
 
           body=$(cat <<EOF
           Automated sync check against [nextcloud/talk-desktop](https://github.com/nextcloud/talk-desktop) main.
@@ -178,6 +221,14 @@ jobs:
           This PR is never auto-merged - review each commit for conflicts with our branding, bundle ID, CalVer versioning, and release plumbing before merging.
 
           Merge it with **Create a merge commit** - never squash or rebase. Either drops the upstream ancestry, and the same upstream commits then come back in the next sync (XEN-256).
+
+          Upstream changes under .github/workflows/ are deliberately left out of this merge (XEN-387). Upstream workflow files added (A), changed (M) or deleted (D) since the last sync, none of which is applied here:
+
+          ${fence}text
+          $DROPPED_WORKFLOWS
+          ${fence}
+
+          After merging, run \`gh workflow list --all\` and check that no upstream workflow is enabled.
 
           ## Upstream commits
 
@@ -206,3 +257,71 @@ jobs:
           msg="DRY RUN: would replace upstream-sync/main in $GITHUB_REPOSITORY with $(git rev-parse --short HEAD) and open a PR against $BASE ($UPSTREAM_COUNT upstream commit(s), clean merge: $MERGE_CLEAN). Nothing was pushed."
           echo "::notice title=Upstream sync dry run::$msg"
           echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+
+      # Drift alarm (XEN-387). Runs last, in dry runs too, and turns the run red when
+      # the sync has stalled. Everything above stays as it was: an open sync PR is
+      # still never overwritten, it just no longer stalls silently.
+      - name: Drift alarm
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BEHIND: ${{ steps.check.outputs.count }}
+          MAIN_SHA: ${{ steps.check.outputs.main }}
+        run: |
+          reasons=()
+
+          if [ "${BEHIND:-0}" -gt "$DRIFT_MAX_BEHIND" ]; then
+            reasons+=("main is $BEHIND upstream commit(s) behind (limit $DRIFT_MAX_BEHIND)")
+          fi
+
+          # The open sync PR, including one this run has just opened.
+          pr_json=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 \
+            --json number,headRefName,createdAt,mergeable \
+            --jq '[.[] | select(.headRefName == "upstream-sync/main")][0] // empty')
+
+          if [ -n "$pr_json" ]; then
+            number=$(jq -r .number <<<"$pr_json")
+            head=$(jq -r .headRefName <<<"$pr_json")
+            created=$(jq -r .createdAt <<<"$pr_json")
+            mergeable=$(jq -r .mergeable <<<"$pr_json")
+            age_days=$(( ( $(date -u +%s) - $(date -u -d "$created" +%s) ) / 86400 ))
+            echo "Open sync PR #$number ($head), opened $created ($age_days day(s) ago), mergeable: $mergeable"
+
+            if [ "$age_days" -ge "$DRIFT_MAX_PR_AGE_DAYS" ]; then
+              reasons+=("sync PR #$number has been open $age_days day(s) (limit $DRIFT_MAX_PR_AGE_DAYS)")
+            fi
+
+            # Main moved on and the PR no longer merges.
+            if [ "$mergeable" = "CONFLICTING" ]; then
+              reasons+=("sync PR #$number conflicts with the current base branch")
+            fi
+
+            # The sync commits conflict markers as ordinary content, so GitHub sees
+            # such a PR as mergeable. Count the marker lines the PR adds. Only
+            # labelled markers are matched, as in xenia-conflict-marker-guard.yml.
+            git fetch -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/pull/$number/head"
+            pattern='^\+(<{7}|>{7}|\|{7}) '
+            canary=$(printf '+%s a\n+%s b\n+%s c\n' "$(printf '%.0s<' 1 2 3 4 5 6 7)" "$(printf '%.0s|' 1 2 3 4 5 6 7)" "$(printf '%.0s>' 1 2 3 4 5 6 7)" | grep -cE "$pattern" || true)
+            if [ "$canary" != "3" ]; then
+              echo "::error::Drift alarm conflict-marker self-test matched $canary of 3 synthetic markers. The check is broken."
+              exit 1
+            fi
+            markers=$(git diff --no-color -U0 "$MAIN_SHA...FETCH_HEAD" | grep -cE "$pattern" || true)
+            if [ "$markers" -gt 0 ]; then
+              reasons+=("sync PR #$number still has $markers unresolved conflict marker line(s)")
+            fi
+          else
+            echo "No open sync PR."
+          fi
+
+          if [ "${#reasons[@]}" -gt 0 ]; then
+            {
+              echo "### Upstream sync drift alarm"
+              echo
+              for r in "${reasons[@]}"; do echo "- $r"; done
+              echo
+              echo "Resolve and merge the sync PR (merge commit), or close it so the next run opens a fresh one."
+            } >> "$GITHUB_STEP_SUMMARY"
+            for r in "${reasons[@]}"; do echo "::error title=Upstream sync drift::$r"; done
+            exit 1
+          fi
+          echo "No drift: within $DRIFT_MAX_BEHIND commits and no stale or conflicted sync PR."
