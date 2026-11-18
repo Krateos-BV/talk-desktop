@@ -63,6 +63,16 @@ function generateDistName(platform, arch, ext) {
 }
 
 /**
+ * Convert a 4-segment CalVer version into SemVer for MakerWix
+ *
+ * @param {string} version - package.json version, e.g. 26.10.31.0
+ * @return {string} SemVer with the 4th segment as build metadata, e.g. 26.10.31+0
+ */
+function toWixSemver(version) {
+	return version.replace(/^(\d+\.\d+\.\d+)\.(\d+)$/, '$1+$2')
+}
+
+/**
  * Move the artifact to the correct location
  *
  * @param {string} artifactPath - The path to the distribution
@@ -260,7 +270,12 @@ module.exports = {
 			// otherwise MakerWix makes versions with prerelease tags invalid semantic version
 			// which breaks app launch via stub executable
 			// See: https://github.com/electron/forge/issues/3805
-			version: packageJSON.version,
+			// The CalVer YY.M.D.ID scheme is not SemVer either: the MSI installs into
+			// "app-<version>" and the stub "Xenia Talk.exe" that every shortcut starts parses
+			// that folder name with a strict SemVer parser. "app-26.10.31.0" makes it throw,
+			// so the installed app never starts (XEN-386). Pass "26.10.31+0" instead:
+			// electron-wix-msi maps "+" back to "." for the MSI ProductVersion (26.10.31.0).
+			version: toWixSemver(packageJSON.version),
 			ui: {
 				images: {
 					background: path.join(__dirname, 'img/wix-background.bmp'),
