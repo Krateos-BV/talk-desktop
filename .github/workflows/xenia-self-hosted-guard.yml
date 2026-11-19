@@ -11,7 +11,9 @@ name: Self-hosted Runner Guard
 # only accepts selected workflows at refs/heads/main, so this guard is the
 # second line: it stops a new workflow, or one arriving from an upstream sync
 # (upstream syncs bring workflows in enabled), from quietly asking for a
-# self-hosted runner. Only xenia-ci.yml may reference the runner variable.
+# self-hosted runner. Only xenia-ci.yml may reference the macOS runner variable,
+# and only xenia-windows-smoke.yml the Windows test runner variable (XEN-390,
+# Dell E7440 runner, which runs no pull request code).
 #
 # Cheap and independent: no SDK, no secrets, hosted Ubuntu runner.
 
@@ -49,12 +51,15 @@ jobs:
           # Built at runtime so this file does not match its own scan.
           sh_label="self""-hosted"
           mm_label="xenia""-mac-mini"
+          win_label="xenia""-win-x64"
           var_name="XENIA""_MACOS_RUNNER"
-          pattern="($sh_label|$mm_label|$var_name)"
+          win_var="XENIA""_WINDOWS_TEST_RUNNER"
+          pattern="($sh_label|$mm_label|$win_label|$var_name|$win_var)"
 
-          # Files allowed to reference the runner variable. Nothing may name
-          # the self-hosted labels literally; they live only in the variable.
-          allowed_var_files=".github/workflows/xenia-ci.yml"
+          # Which file may reference which runner variable ("file=variable").
+          # Nothing may name the self-hosted labels literally; they live only in
+          # the variables.
+          allowed_var_files=".github/workflows/xenia-ci.yml=$var_name .github/workflows/xenia-windows-smoke.yml=$win_var"
 
           # Canary: prove the pattern matches before trusting a clean result.
           canary=$(mktemp -d)
@@ -62,14 +67,16 @@ jobs:
             printf 'runs-on: [%s, macOS]\n' "$sh_label"
             printf 'runs-on: %s\n' "$mm_label"
             printf 'runs-on: fromJSON(vars.%s)\n' "$var_name"
+            printf 'runs-on: [%s]\n' "$win_label"
+            printf 'runs-on: fromJSON(vars.%s)\n' "$win_var"
           } > "$canary/sample.yml"
           found=$(grep -c -i -E "$pattern" "$canary/sample.yml" || true)
           rm -rf "$canary"
-          if [ "$found" != "3" ]; then
-            echo "::error::Self-test failed: matched '$found' of 3 synthetic lines. Fix the guard rather than ignoring this run."
+          if [ "$found" != "5" ]; then
+            echo "::error::Self-test failed: matched '$found' of 5 synthetic lines. Fix the guard rather than ignoring this run."
             exit 1
           fi
-          echo "Pattern self-test OK (3/3)."
+          echo "Pattern self-test OK (5/5)."
 
           set +e
           # This file is excluded (its own names say what it guards), and
@@ -95,10 +102,18 @@ jobs:
               continue
             fi
             ok=0
-            for f in $allowed_var_files; do
-              # The allowed file may name the variable, but never a label literally.
-              if [ "$file" = "$f" ] && ! printf '%s' "$text" | grep -q -i -E "($sh_label|$mm_label)"; then
-                ok=1
+            for entry in $allowed_var_files; do
+              f=${entry%%=*}
+              v=${entry#*=}
+              # The allowed file may name its own variable only: never a label
+              # literally, and never the other runner's variable.
+              if [ "$file" = "$f" ] \
+                && printf '%s' "$text" | grep -q -i -F "$v" \
+                && ! printf '%s' "$text" | grep -q -i -E "($sh_label|$mm_label|$win_label)"; then
+                other=$var_name; [ "$v" = "$var_name" ] && other=$win_var
+                if ! printf '%s' "$text" | grep -q -i -F "$other"; then
+                  ok=1
+                fi
               fi
             done
             if [ "$ok" = 0 ]; then
@@ -108,7 +123,7 @@ jobs:
           done < hits.txt
 
           if [ "$bad" -gt 0 ]; then
-            echo "::error::$bad self-hosted runner reference(s) outside the allow-list (XEN-325). Only xenia-ci.yml may use the runner variable."
+            echo "::error::$bad self-hosted runner reference(s) outside the allow-list (XEN-325). Only xenia-ci.yml may use the macOS runner variable and only xenia-windows-smoke.yml the Windows one."
             exit 1
           fi
           echo "No self-hosted runner use outside the allow-list."

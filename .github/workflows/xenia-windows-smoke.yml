@@ -1,0 +1,253 @@
+# SPDX-FileCopyrightText: 2026 XeniaCloud
+# SPDX-License-Identifier: MIT
+
+name: Xenia Windows smoke test
+
+# Installs the Windows MSI on real x64 Windows, starts it the way a user does (Start
+# menu shortcut), and checks the app is still running with a window 30 seconds later.
+# Then it does the same as an upgrade over the latest published release. XEN-390.
+#
+# Why: XEN-386 (the MSI installed but the app never started) passed every build check,
+# because nothing ever opened the installed app. Hosted runners have no real desktop
+# session, so this runs on the Dell E7440 runner, inside Windows Sandbox: every run
+# starts from a clean throwaway Windows and leaves nothing behind on the host.
+#
+# Where it runs: only when repo variable XENIA_WINDOWS_TEST_RUNNER is set (JSON label
+# list, ["self-hosted","xenia-win-x64"]). Unset means the job is skipped, never sent to
+# a hosted runner. Deleting the variable is the rollback.
+#
+# Never runs pull request code: triggers are workflow_run (always runs this file from
+# main) for push events only (Xenia CI on main, Xenia Release on v* tags), and
+# workflow_dispatch. The org runner group only accepts this file at refs/heads/main.
+# No secrets are used; the job token only reads artifacts and releases.
+
+on:
+  workflow_run:
+    workflows: ["Xenia CI (unsigned build)", "Xenia Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run id of a Xenia CI or Xenia Release run whose Windows artifact to test"
+        required: true
+      previous_tag:
+        description: "Release tag to upgrade from (empty = latest published release, 'none' = skip upgrade test)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+# One sandbox at a time on a 2-core laptop.
+concurrency:
+  group: xenia-windows-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    if: >-
+      vars.XENIA_WINDOWS_TEST_RUNNER != '' && (
+        github.event_name == 'workflow_dispatch' || (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
+    runs-on: ${{ fromJSON(vars.XENIA_WINDOWS_TEST_RUNNER) }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: powershell
+    env:
+      RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
+      ARTIFACT: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Xenia Release') && 'release-windows' || 'xenia-talk-windows' }}
+      PREVIOUS_TAG: ${{ inputs.previous_tag }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Prepare folders
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = Join-Path $env:RUNNER_TEMP 'smoke'
+          Remove-Item -Recurse -Force $base -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "$base\in", "$base\out", "$base\artifact" | Out-Null
+          "SMOKE=$base" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          Write-Host "Testing artifact '$env:ARTIFACT' of run $env:RUN_ID"
+
+      # A dispatch can name any run id, including a fork pull request's CI run. Only
+      # artifacts built from this repo's main (Xenia CI) or a v* tag (Xenia Release) by a
+      # push may reach the Dell. Checked for workflow_run too, as a second line.
+      - name: Verify the source run is a push build of main or a v* tag
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUN_ID -notmatch '^[0-9]+$') { throw 'run_id must be a number.' }
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'xenia-windows-smoke'; Accept = 'application/vnd.github+json' }
+          $run = Invoke-RestMethod -Headers $h "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/runs/$env:RUN_ID"
+          $okCi  = $run.name -eq 'Xenia CI (unsigned build)' -and $run.head_branch -eq 'main'
+          $okRel = $run.name -eq 'Xenia Release' -and $run.head_branch -match '^v[0-9]'
+          $reasons = @()
+          if ($run.event -ne 'push') { $reasons += 'event is not push' }
+          if ($run.repository.full_name -ne $env:GITHUB_REPOSITORY -or $run.head_repository.full_name -ne $env:GITHUB_REPOSITORY) { $reasons += 'built from another repository' }
+          if (-not ($okCi -or $okRel)) { $reasons += 'not Xenia CI on main or Xenia Release on a v* tag' }
+          if ($run.conclusion -ne 'success') { $reasons += 'run did not succeed' }
+          if ($reasons) { throw "Refusing run $($env:RUN_ID): $($reasons -join '; ')." }
+          Write-Host "Source run $($env:RUN_ID) accepted (push build, $($run.head_sha))."
+
+      # Release runs name the artifact release-windows; a dispatch may point at either kind.
+      - name: Download candidate (CI artifact name)
+        id: dl_ci
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: xenia-talk-windows
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/smoke/artifact
+
+      - name: Download candidate (release artifact name)
+        if: steps.dl_ci.outcome != 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/smoke/artifact
+
+      - name: Pick the candidate MSI and the previous release MSI
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = Get-ChildItem "$env:SMOKE\artifact" -Recurse -Filter *.msi | Select-Object -First 1
+          if (-not $msi) { throw 'No .msi in the downloaded artifact.' }
+          Copy-Item $msi.FullName "$env:SMOKE\in\candidate.msi"
+          Write-Host "Candidate: $($msi.FullName) ($([math]::Round($msi.Length/1MB,1)) MB)"
+
+          if ($env:PREVIOUS_TAG -eq 'none') { Write-Host 'Upgrade test skipped (previous_tag=none).'; exit 0 }
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'xenia-windows-smoke'; Accept = 'application/vnd.github+json' }
+          $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases"
+          $rel = if ($env:PREVIOUS_TAG) { Invoke-RestMethod -Headers $h "$api/tags/$env:PREVIOUS_TAG" } else { Invoke-RestMethod -Headers $h "$api/latest" }
+          $asset = $rel.assets | Where-Object name -like '*windows-x64.msi' | Select-Object -First 1
+          if (-not $asset) { Write-Host "::warning::Release $($rel.tag_name) has no Windows MSI; upgrade test skipped."; exit 0 }
+          $h.Accept = 'application/octet-stream'
+          Invoke-WebRequest -UseBasicParsing -Headers $h -Uri $asset.url -OutFile "$env:SMOKE\in\previous.msi"
+          Write-Host "Previous: $($rel.tag_name) $($asset.name)"
+          $rel.tag_name | Out-File -Encoding ascii "$env:SMOKE\in\previous-tag.txt"
+
+      - name: Write the in-sandbox test script
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @'
+          # Runs inside Windows Sandbox as WDAGUtilityAccount. Results go to C:\smoke\out.
+          $ErrorActionPreference = 'Continue'
+          $in = 'C:\smoke\in'; $out = 'C:\smoke\out'
+          $result = [ordered]@{ steps = @() }
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+
+          function Shot($name) {
+            $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+            $bmp.Save("$out\$name.png", [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose(); $bmp.Dispose()
+          }
+
+          function Install($label, $msi) {
+            $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart', '/l*v', "`"$out\$label-msi.log`"") -Wait -PassThru
+            return $p.ExitCode
+          }
+
+          function LaunchAndCheck($label) {
+            Get-Process -Name 'Xenia Talk' -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep 2
+            $lnk = Get-ChildItem 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs', "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter '*Xenia Talk*.lnk' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $lnk) { return @{ step = $label; ok = $false; why = 'No Start menu shortcut found' } }
+            # Through explorer.exe so the app starts unelevated, like a user's click.
+            Start-Process explorer.exe -ArgumentList "`"$($lnk.FullName)`""
+            Start-Sleep 30
+            $procs = @(Get-Process -Name 'Xenia Talk' -ErrorAction SilentlyContinue)
+            $win = @($procs | Where-Object { $_.MainWindowHandle -ne 0 })
+            Shot $label
+            $dirs = @(Get-ChildItem 'C:\Program Files\Xenia Talk' -Directory -Filter 'app-*' -ErrorAction SilentlyContinue | ForEach-Object Name)
+            $ok = ($procs.Count -gt 0 -and $win.Count -gt 0)
+            return @{ step = $label; ok = $ok; shortcut = $lnk.FullName; processes = $procs.Count; windows = $win.Count;
+                      window_title = ($win | Select-Object -First 1).MainWindowTitle; app_dirs = $dirs;
+                      why = $(if ($ok) { '' } elseif ($procs.Count -eq 0) { 'App not running 30 s after launch' } else { 'Running but no window' }) }
+          }
+
+          try {
+            if (Test-Path "$in\previous.msi") {
+              $rc = Install 'previous' "$in\previous.msi"
+              $result.steps += @{ step = 'install-previous'; ok = ($rc -eq 0); exit_code = $rc }
+              # The previous release may itself be broken (v26.10.31.0 is: XEN-386). Recorded, not gating.
+              $r = LaunchAndCheck 'launch-previous'; $r.gating = $false; $result.steps += $r
+            }
+            $rc = Install 'candidate' "$in\candidate.msi"
+            $result.steps += @{ step = 'install-candidate'; ok = ($rc -eq 0 -or $rc -eq 3010); exit_code = $rc }
+            $r = LaunchAndCheck 'launch-candidate'
+            # After an upgrade only the new app-* folder may remain: a leftover makes the stub fail (XEN-386).
+            if ($r.app_dirs.Count -gt 1) { $r.ok = $false; $r.why = "More than one app-* folder: $($r.app_dirs -join ', ')" }
+            $result.steps += $r
+          } catch {
+            $result.steps += @{ step = 'script'; ok = $false; why = $_.ToString() }
+          }
+          Copy-Item "$env:APPDATA\Xenia Talk\logs" "$out\app-logs" -Recurse -ErrorAction SilentlyContinue
+          $result.pass = -not ($result.steps | Where-Object { $_.ok -eq $false -and $_.gating -ne $false })
+          $result | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8 "$out\result.json"
+          'done' | Out-File -Encoding ascii "$out\done.txt"
+          '@ | Out-File -Encoding utf8 "$env:SMOKE\in\guest.ps1"
+
+          @"
+          <Configuration>
+            <Networking>Disable</Networking>
+            <vGPU>Disable</vGPU>
+            <MemoryInMB>3072</MemoryInMB>
+            <MappedFolders>
+              <MappedFolder><HostFolder>$env:SMOKE\in</HostFolder><SandboxFolder>C:\smoke\in</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
+              <MappedFolder><HostFolder>$env:SMOKE\out</HostFolder><SandboxFolder>C:\smoke\out</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>
+            </MappedFolders>
+            <LogonCommand>
+              <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\smoke\in\guest.ps1</Command>
+            </LogonCommand>
+          </Configuration>
+          "@ | Out-File -Encoding utf8 "$env:SMOKE\smoke.wsb"
+
+      - name: Run the test in Windows Sandbox
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Process -Name WindowsSandbox -ErrorAction SilentlyContinue) { throw 'A Windows Sandbox is already running on this host.' }
+          Start-Process "$env:SMOKE\smoke.wsb"
+          $deadline = (Get-Date).AddMinutes(25)
+          while (-not (Test-Path "$env:SMOKE\out\done.txt") -and (Get-Date) -lt $deadline) { Start-Sleep 10 }
+          Get-Process -Name WindowsSandbox, WindowsSandboxClient -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not (Test-Path "$env:SMOKE\out\done.txt")) { throw 'Sandbox test did not finish within 25 minutes.' }
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-smoke-evidence
+          path: ${{ runner.temp }}/smoke/out/**
+          if-no-files-found: warn
+
+      - name: Verdict
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $r = Get-Content "$env:SMOKE\out\result.json" -Raw | ConvertFrom-Json
+          # result.json is written inside the sandbox by code under test, so its strings are
+          # untrusted: keep only safe characters (no '::' workflow commands, no Markdown).
+          function Clean($v) { if ($null -eq $v) { return '' }; ("$v" -replace '[^A-Za-z0-9 ._,()/+=-]', '?').Substring(0, [math]::Min(200, "$v".Length)) }
+          foreach ($s in $r.steps) {
+            $mark = if ($s.ok -eq $true) { 'PASS' } elseif ($s.gating -eq $false) { 'FAIL (not gating)' } else { 'FAIL' }
+            $step = Clean $s.step; $why = Clean $s.why
+            Write-Host ("{0,-18} {1,-18} {2}" -f $step, $mark, $why)
+            "| $step | $mark | $why |" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+          }
+          if ($r.pass -ne $true) { throw 'Windows smoke test failed. Screenshots and MSI logs are in the windows-smoke-evidence artifact.' }
+          Write-Host 'Windows smoke test passed.'
+
+      - name: Clean up
+        if: always()
+        run: |
+          Get-Process -Name WindowsSandbox, WindowsSandboxClient -ErrorAction SilentlyContinue | Stop-Process -Force
+          Remove-Item -Recurse -Force "$env:RUNNER_TEMP\smoke" -ErrorAction SilentlyContinue
