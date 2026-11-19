@@ -75,6 +75,25 @@ jobs:
           "SMOKE=$base" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
           Write-Host "Testing artifact '$env:ARTIFACT' of run $env:RUN_ID"
 
+      # A dispatch can name any run id, including a fork pull request's CI run. Only
+      # artifacts built from this repo's main (Xenia CI) or a v* tag (Xenia Release) by a
+      # push may reach the Dell. Checked for workflow_run too, as a second line.
+      - name: Verify the source run is a push build of main or a v* tag
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUN_ID -notmatch '^[0-9]+$') { throw 'run_id must be a number.' }
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'xenia-windows-smoke'; Accept = 'application/vnd.github+json' }
+          $run = Invoke-RestMethod -Headers $h "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/runs/$env:RUN_ID"
+          $okCi  = $run.name -eq 'Xenia CI (unsigned build)' -and $run.head_branch -eq 'main'
+          $okRel = $run.name -eq 'Xenia Release' -and $run.head_branch -match '^v[0-9]'
+          $reasons = @()
+          if ($run.event -ne 'push') { $reasons += 'event is not push' }
+          if ($run.repository.full_name -ne $env:GITHUB_REPOSITORY -or $run.head_repository.full_name -ne $env:GITHUB_REPOSITORY) { $reasons += 'built from another repository' }
+          if (-not ($okCi -or $okRel)) { $reasons += 'not Xenia CI on main or Xenia Release on a v* tag' }
+          if ($run.conclusion -ne 'success') { $reasons += 'run did not succeed' }
+          if ($reasons) { throw "Refusing run $($env:RUN_ID): $($reasons -join '; ')." }
+          Write-Host "Source run $($env:RUN_ID) accepted (push build, $($run.head_sha))."
+
       # Release runs name the artifact release-windows; a dispatch may point at either kind.
       - name: Download candidate (CI artifact name)
         id: dl_ci
@@ -215,12 +234,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $r = Get-Content "$env:SMOKE\out\result.json" -Raw | ConvertFrom-Json
+          # result.json is written inside the sandbox by code under test, so its strings are
+          # untrusted: keep only safe characters (no '::' workflow commands, no Markdown).
+          function Clean($v) { if ($null -eq $v) { return '' }; ("$v" -replace '[^A-Za-z0-9 ._,()/+=-]', '?').Substring(0, [math]::Min(200, "$v".Length)) }
           foreach ($s in $r.steps) {
-            $mark = if ($s.ok) { 'PASS' } elseif ($s.gating -eq $false) { 'FAIL (not gating)' } else { 'FAIL' }
-            Write-Host ("{0,-18} {1,-18} {2}" -f $s.step, $mark, $s.why)
-            "| $($s.step) | $mark | $($s.why) |" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+            $mark = if ($s.ok -eq $true) { 'PASS' } elseif ($s.gating -eq $false) { 'FAIL (not gating)' } else { 'FAIL' }
+            $step = Clean $s.step; $why = Clean $s.why
+            Write-Host ("{0,-18} {1,-18} {2}" -f $step, $mark, $why)
+            "| $step | $mark | $why |" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
           }
-          if (-not $r.pass) { throw 'Windows smoke test failed. Screenshots and MSI logs are in the windows-smoke-evidence artifact.' }
+          if ($r.pass -ne $true) { throw 'Windows smoke test failed. Screenshots and MSI logs are in the windows-smoke-evidence artifact.' }
           Write-Host 'Windows smoke test passed.'
 
       - name: Clean up
