@@ -6,13 +6,15 @@
 const { MakerDMG } = require('@electron-forge/maker-dmg')
 const { MakerFlatpak } = require('@electron-forge/maker-flatpak')
 const { MakerSquirrel } = require('@electron-forge/maker-squirrel')
-const { MakerWix } = require('@electron-forge/maker-wix')
 const { MakerZIP } = require('@electron-forge/maker-zip')
+const { FusesPlugin } = require('@electron-forge/plugin-fuses')
+const { FuseV1Options, FuseVersion } = require('@electron/fuses')
 const cheerio = require('cheerio')
 const mri = require('mri')
 const fs = require('node:fs')
 const path = require('node:path')
 const semver = require('semver')
+const { MakerWix } = require('./build/MakerWix.js')
 const { resolveBuildConfig, resolveTalkPath } = require('./build/resolveBuildConfig.js')
 const packageJSON = require('./package.json')
 const { MIN_REQUIRED_BUILT_IN_TALK_VERSION } = require('./src/constants.js')
@@ -247,6 +249,7 @@ module.exports = {
 			appleIdPassword: process.env.APPLE_ID_PASSWORD,
 			teamId: process.env.APPLE_TEAM_ID,
 		},
+		windowsSign: hasWindowsSign && signWithParamsToWindowsSignOptions(process.env.WINDOWS_SIGN_PARAMS),
 	},
 
 	makers: [
@@ -258,7 +261,12 @@ module.exports = {
 		// 2. Add C:\Program Files (x86)\WiX Toolset v3.14\bin\ to PATH
 		BUILD_CONFIG.windowsMsi && new MakerWix({
 			appUserModelId: BUILD_CONFIG.winAppId,
-			description: BUILD_CONFIG.description,
+			// electron-wix-msi tries to get FileDescription from the packaged app without using packagerConfig.win32metadata.FileDescription
+			// It may fail to read it and falls back to options.description, which is not correct:
+			// FileDescription is .exe's FriendlyApplicationName and must be the human readable application name, not a short description
+			// Workaround: using application name here to make sure the FileDescription is the executable name
+			// Caveats: losing the description in start menu/desktop shortcuts title on hover
+			description: BUILD_CONFIG.applicationName,
 			exe: `${BUILD_CONFIG.applicationName}.exe`,
 			name: BUILD_CONFIG.applicationName,
 			icon: path.join(__dirname, 'img/icons/icon.ico'),
@@ -311,7 +319,7 @@ module.exports = {
 					$('<firewall:FirewallException></firewall:FirewallException>').attr({
 						Id: $executableFile.attr('Id') + '_firewall_exception',
 						Name: BUILD_CONFIG.applicationName,
-						Description: BUILD_CONFIG.description,
+						Description: `Allow network traffic for ${BUILD_CONFIG.applicationName}`,
 						Scope: 'any',
 						IgnoreFailure: 'yes',
 					}).appendTo($executableFile)
@@ -657,5 +665,21 @@ module.exports = {
 				},
 			},
 		},
+		new FusesPlugin({
+			version: FuseVersion.V1,
+			// Without osxSign the plugin ad-hoc re-signs only the arm64 slice after flipping fuses,
+			// which adds _CodeSignature files that the x64 slice lacks, and stitching the universal
+			// app then fails ("the number of mach-o files is not the same"). That is every unsigned
+			// universal build, e.g. build-macos on PRs (XEN-397). Signed builds set osxSign and are
+			// not affected; they are signed after stitching anyway. Single-arch builds keep the
+			// plugin's default.
+			...(!hasMacosSign && argArch === 'universal' ? { resetAdHocDarwinSignature: false } : {}),
+			[FuseV1Options.RunAsNode]: false,
+			[FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+			[FuseV1Options.EnableNodeCliInspectArguments]: false,
+			[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+			[FuseV1Options.OnlyLoadAppFromAsar]: true,
+			[FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
+		}),
 	],
 }

@@ -11,13 +11,18 @@ import { registerTalkDesktopSettingsSection } from '../Settings/index.ts'
 import { onTalkHashDirty, onTalkHashUpdate, openConversation, setTalkHash } from './talk.service.ts'
 import { useBadgeCountIntegration } from './useBadgeCountIntegration.ts'
 
+// The Talk reference widget (upstream 42fd3c61) needs built-in Talk v25.0.8 or later
+// (src/integrations/reference). We pin v25.0.6 until the v25.0.8 pin is compat-tested in its
+// own PR (XEN-385 plan step 8); restore this import together with that pin change.
+// import '@nextcloud/talk/src/integrations/reference/reference.ts'
+
 const emit = defineEmits<{
 	ready: []
 }>()
 
 onMounted(async () => {
 	// Importing the main Talk entry point mounts a Vue app to the #content
-	await import('@talk/src/main.js')
+	await import('@nextcloud/talk/src/main.js')
 
 	// Additional integrations
 	registerTalkDesktopSettingsSection()

@@ -208,7 +208,7 @@ export async function checkForUpdate({ forceRequest = false }: { forceRequest?: 
 	// release page. A build with no release repository configured still checks nothing.
 	// Guarding here covers every caller - including the renderer's main menu, which calls this
 	// directly on every mount and never went through the scheduler's own !isBranded gate.
-	if (!BUILD_CONFIG.updateRepository) {
+	if (!BUILD_CONFIG.updateRepository || getAppConfig('skipUpdateCheck')) {
 		return null
 	}
 
@@ -249,6 +249,14 @@ let schedulerIntervalId: NodeJS.Timeout | undefined
 export function setupReleaseNotificationScheduler(intervalInMin: number = 60) {
 	if (schedulerIntervalId !== undefined) {
 		stopReleaseNotificationScheduler()
+	}
+
+	if (process.env.NODE_ENV !== 'production') {
+		return
+	}
+
+	if (getAppConfig('skipUpdateCheck')) {
+		return
 	}
 
 	checkForUpdate()

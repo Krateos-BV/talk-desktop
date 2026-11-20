@@ -3,10 +3,12 @@ OC.L10N.register(
     {
     "Server address" : "সার্ভার ঠিকানা",
     "Log in" : "প্রবেশ",
+    "Open in browser" : "Open in browser",
+    "Copy link" : "লিঙ্ক কপি করো",
+    "Cancel" : "বাতিল করুন",
     "Close" : "বন্ধ",
     "Dismiss" : "Dismiss",
     "Advanced" : "সুচারু",
-    "Cancel" : "বাতিল করুন",
     "Done" : "শেষ হলো",
     "Ok" : "তথাস্তু",
     "No" : "না",
