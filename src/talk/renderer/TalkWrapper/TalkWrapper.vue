@@ -11,13 +11,15 @@ import { registerTalkDesktopSettingsSection } from '../Settings/index.ts'
 import { onTalkHashDirty, onTalkHashUpdate, openConversation, setTalkHash } from './talk.service.ts'
 import { useBadgeCountIntegration } from './useBadgeCountIntegration.ts'
 
+import '@nextcloud/talk/src/integrations/reference/reference.ts'
+
 const emit = defineEmits<{
 	ready: []
 }>()
 
 onMounted(async () => {
 	// Importing the main Talk entry point mounts a Vue app to the #content
-	await import('@talk/src/main.js')
+	await import('@nextcloud/talk/src/main.js')
 
 	// Additional integrations
 	registerTalkDesktopSettingsSection()

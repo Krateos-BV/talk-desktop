@@ -16,14 +16,13 @@ const { cli } = require('./app/cli.ts')
 const { openChromeWebRtcInternals } = require('./app/dev.utils.ts')
 const { triggerDownloadUrl } = require('./app/downloads.ts')
 const { setupReleaseNotificationScheduler, checkForUpdate } = require('./app/githubRelease.service.ts')
-const { initLaunchAtStartupListener } = require('./app/launchAtStartup.config.ts')
+const { setupLaunchAtStartup } = require('./app/launchAtStartup.config.ts')
 const { runMigrations } = require('./app/migration.service.ts')
 const { systemInfo, isMac, isWindows, isSameExecution, isSquirrel, relaunchApp } = require('./app/system.utils.ts')
 const { applyTheme } = require('./app/theme.config.ts')
 const { buildTitle, onReadyToShow } = require('./app/utils.ts')
 const { enableWebRequestInterceptor, disableWebRequestInterceptor } = require('./app/webRequestInterceptor.js')
 const { createAuthenticationWindow } = require('./authentication/authentication.window.ts')
-const { openLoginWebView } = require('./authentication/loginFlowV1.window.ts')
 const { createCallboxWindow } = require('./callbox/callbox.window.ts')
 const { createHelpWindow } = require('./help/help.window.js')
 const { installVueDevtools } = require('./install-vue-devtools.js')
@@ -132,7 +131,7 @@ app.whenReady().then(async () => {
 	await cli(argv)
 
 	applyTheme()
-	initLaunchAtStartupListener()
+	setupLaunchAtStartup()
 	registerAppProtocolHandler()
 
 	/**
@@ -288,8 +287,6 @@ app.whenReady().then(async () => {
 
 	ipcMain.handle('talk:focus', async () => focusMainWindow())
 
-	ipcMain.handle('authentication:openLoginWebView', async (event, serverUrl, user) => openLoginWebView(mainWindow, serverUrl, user))
-
 	ipcMain.handle('authentication:login', async (event, newAppData) => {
 		appData.fromJSON(newAppData)
 		mainWindow.close()
@@ -302,6 +299,7 @@ app.whenReady().then(async () => {
 		if (createMainWindow === createTalkWindow) {
 			appData.reset()
 			await mainWindow.webContents.session.clearStorageData()
+			await mainWindow.webContents.session.clearCache()
 			app.setBadgeCount(0)
 			const authenticationWindow = createAuthenticationWindow()
 			createMainWindow = createAuthenticationWindow

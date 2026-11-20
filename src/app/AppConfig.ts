@@ -6,6 +6,7 @@
 import { app, webContents } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { BUILD_CONFIG } from '../shared/build.config.ts'
 import { readManagedConfig } from './managedConfig.service.ts'
 import { isMac } from './system.utils.ts'
 
@@ -54,11 +55,6 @@ export type AppConfig = {
 	// ----------------
 
 	/**
-	 * Whether to launch the application at startup
-	 * Default: false
-	 */
-	launchAtStartup: boolean
-	/**
 	 * Whether to launch the application at startup in background (without opening the window).
 	 * Default: true
 	 */
@@ -68,6 +64,11 @@ export type AppConfig = {
 	 * Default: 'beta' when running a beta or dev build, 'stable' otherwise.
 	 */
 	releaseChannel: 'stable' | 'beta'
+	/**
+	 * Whether to skip update check completely as a feature.
+	 * Default: false
+	 */
+	skipUpdateCheck: boolean
 
 	// -------------------
 	// Appearance settings
@@ -159,9 +160,9 @@ export type AppConfigKey = keyof AppConfig
  */
 const defaultAppConfig: AppConfig = {
 	accounts: [],
-	launchAtStartup: false,
 	launchAtStartupInBackground: true,
 	releaseChannel: __CHANNEL__ === 'stable' ? 'stable' : 'beta',
+	skipUpdateCheck: false,
 	theme: 'default',
 	highContrast: 'default',
 	dyslexicFont: false,
@@ -183,12 +184,12 @@ const defaultAppConfig: AppConfig = {
 const managedAppConfig = readManagedConfig()
 
 /**
- * Forced App Config.
- * Overrides any config value if set, including user defined.
+ * Enforced App Config.
+ * Overrides any config value if set, including user defined or managed, cannot be changed.
  */
-const forcedAppConfig: Partial<AppConfig> = Object.fromEntries(Object.entries({
-	// Nothing at the moment
-}).filter(([, value]) => value !== undefined))
+const enforcedAppConfig: Partial<AppConfig> = {
+	...(BUILD_CONFIG.isBranded ? { skipUpdateCheck: true } : {}),
+}
 
 /** Local cache of the config file mixed with the default values */
 const appConfig: Partial<AppConfig> = {}
@@ -264,7 +265,7 @@ export function getAppConfig<T extends AppConfigKey>(key?: T): AppConfig | AppCo
 			...managedAppConfig.accounts ?? [],
 			...appConfig.accounts ?? [],
 		],
-		...forcedAppConfig,
+		...enforcedAppConfig,
 	}
 
 	if (key) {
