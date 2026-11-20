@@ -3,8 +3,18 @@
 
 name: Xenia Upstream Sync
 
-# Periodically checks nextcloud/talk-desktop:main for commits we don't have yet and
-# opens a PR so they get triaged instead of silently piling up. This fork has diverged
+# Periodically checks nextcloud/talk-desktop for a newer upstream RELEASE than main has
+# and opens a PR so it gets triaged instead of silently piling up.
+#
+# Release tags, not the tip of upstream main (XEN-396, plan XEN-385 section 4B). The
+# target is the newest stable tag vX.Y.Z that is reachable from upstream main
+# (pre-releases such as v2.3.0-beta and tags cut on other branches are ignored). So
+# every sync PR maps to an upstream release note, the merge point does not move under
+# a PR while it is being tested, and nothing half-finished from upstream's development
+# line reaches our builds. One PR per release, on branch upstream-sync/<tag>. A manual
+# dispatch can pin an older or the current tag with the `tag` input. Upstream tags
+# are fetched into refs/upstream-tags/ so they never mix with our own CalVer v* tags.
+# This fork has diverged
 # heavily on branding/config/release plumbing (see xenia-release.yml, xenia-ci.yml and
 # the XNT-* branding/login/CalVer fixes), so this workflow deliberately NEVER merges
 # anything automatically - it only surfaces what upstream has and lets a human decide
@@ -18,9 +28,11 @@ name: Xenia Upstream Sync
 # conflicted PR could sit for weeks while every weekly run finished green with only a
 # notice (PR #55, opened 9 Nov, still open on 18 Nov at 107 commits behind). The last
 # step now fails the run, which GitHub emails, when the open sync PR is older than
-# DRIFT_MAX_PR_AGE_DAYS, still has conflicts, or main is more than
-# DRIFT_MAX_BEHIND upstream commits behind. Android (XEN-313) and iOS (XEN-308)
-# have the same alarm.
+# DRIFT_MAX_PR_AGE_DAYS, still has conflicts, is for an older release than the newest
+# one, or main is more than DRIFT_MAX_BEHIND commits behind the newest upstream
+# release (XEN-396: measured against the release, not upstream main, so upstream
+# work between releases does not trip it). Android (XEN-313) and iOS (XEN-308) have
+# the same alarm.
 
 on:
   schedule:
@@ -32,6 +44,10 @@ on:
         description: 'Look up the sync PR and attempt the merge, but do not push or open a PR'
         type: boolean
         default: false
+      tag:
+        description: 'Upstream release tag to sync to, e.g. v2.3.5 (empty = newest stable release on upstream main)'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -74,38 +90,78 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # --no-tags plus an explicit namespace: upstream's v2.x release tags must not land
+      # in refs/tags/ next to our own CalVer release tags (a v* tag there cuts a release).
       - name: Fetch upstream
-        run: git remote add upstream https://github.com/nextcloud/talk-desktop.git && git fetch upstream main
-
-      - name: Check for new upstream commits
-        id: check
         run: |
-          count=$(git rev-list --count HEAD..upstream/main)
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          echo "main=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "$count new upstream commit(s)"
+          git remote add upstream https://github.com/nextcloud/talk-desktop.git
+          git fetch --no-tags upstream '+refs/heads/main:refs/remotes/upstream/main' '+refs/tags/v*:refs/upstream-tags/v*'
+
+      - name: Pick the upstream release to sync to
+        id: check
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$REQUESTED_TAG" ]; then
+            tag="$REQUESTED_TAG"
+            if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::tag input '$tag' is not a stable upstream release tag (vX.Y.Z)."
+              exit 1
+            fi
+            if ! git rev-parse -q --verify "refs/upstream-tags/$tag^{commit}" >/dev/null; then
+              echo "::error::Upstream has no tag $tag."
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "refs/upstream-tags/$tag" upstream/main; then
+              echo "::error::Upstream tag $tag is not on upstream main, so merging it would bring in a side branch."
+              exit 1
+            fi
+          else
+            # Newest stable release reachable from upstream main. Pre-releases
+            # (v2.3.0-beta) and tags cut on maintenance branches are skipped.
+            tag=$(git for-each-ref --merged upstream/main --format='%(refname:strip=2)' refs/upstream-tags/ \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+            if [ -z "$tag" ]; then
+              echo "::error::Found no stable upstream release tag (vX.Y.Z) on upstream main."
+              exit 1
+            fi
+          fi
+          sha=$(git rev-parse "refs/upstream-tags/$tag^{commit}")
+          count=$(git rev-list --count "HEAD..$sha")
+          {
+            echo "tag=$tag"
+            echo "sha=$sha"
+            echo "count=$count"
+            echo "main=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+          echo "Upstream release $tag ($sha): $count commit(s) not in main. For reference, upstream main is $(git rev-list --count HEAD..upstream/main) commit(s) ahead of main."
 
       # --repo is load-bearing. Without it gh resolves the repository from the git remotes
       # and, with no TTY, prefers the remote named `upstream` (added above) over `origin`,
       # so it searched nextcloud/* for our sync PR, never found it, force-pushed over the
       # open PR's branch and then failed with "A pull request already exists". (XEN-284)
+      # Any open upstream-sync/* PR blocks a new one, including one for an older release
+      # and the pre-XEN-396 upstream-sync/main branch: one sync at a time.
       - name: Check for an existing open sync PR
         id: existing
         if: steps.check.outputs.count != '0'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           UPSTREAM_COUNT: ${{ steps.check.outputs.count }}
+          TAG: ${{ steps.check.outputs.tag }}
         run: |
-          open_pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head upstream-sync/main --json number --jq '.[0].number // ""')
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("upstream-sync/"))][0] // empty | "\(.number) \(.headRefName)"')
+          open_pr=${open%% *}
           echo "pr=$open_pr" >> "$GITHUB_OUTPUT"
           if [ -n "$open_pr" ]; then
             # An open sync PR may carry human conflict resolutions, so it is never
             # overwritten. Skip loudly instead of silently.
-            msg="Sync PR #$open_pr is still open in $GITHUB_REPOSITORY - leaving upstream-sync/main untouched. $UPSTREAM_COUNT upstream commit(s) are pending; merge or close #$open_pr and the next run picks them up."
+            msg="Sync PR #$open_pr (${open#* }) is still open in $GITHUB_REPOSITORY - not opening one for upstream release $TAG. $UPSTREAM_COUNT upstream commit(s) up to $TAG are pending; merge or close #$open_pr and the next run picks them up."
             echo "::notice title=Upstream sync skipped::$msg"
             echo "$msg" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No open sync PR with head upstream-sync/main in $GITHUB_REPOSITORY."
+            echo "No open upstream-sync/* PR in $GITHUB_REPOSITORY."
           fi
 
       - name: Configure git identity
@@ -114,25 +170,32 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Attempt merge of upstream/main
+      - name: Attempt merge of the upstream release
         id: merge
         if: steps.check.outputs.count != '0' && steps.existing.outputs.pr == ''
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+          SHA: ${{ steps.check.outputs.sha }}
         run: |
           # Base tip the sync branch is cut from, for the commit list below.
           echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          git checkout -b upstream-sync/main
+          branch="upstream-sync/$TAG"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          git checkout -b "$branch"
 
           # Upstream workflow files it adds or changes, listed in the PR body because
           # they are left out of the merge below.
-          dropped=$(git diff --no-renames --name-status HEAD...upstream/main -- .github/workflows/ | sed 's/^/- /')
+          dropped=$(git diff --no-renames --name-status "HEAD...$SHA" -- .github/workflows/ | sed 's/^/- /')
           {
             echo "dropped<<EOF"
             echo "$dropped"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+          # The commit, not the tag name, is merged: the tag only lives under
+          # refs/upstream-tags/ here, and the message below names it instead.
           merge_ok=true
-          git merge --no-commit --no-ff upstream/main || merge_ok=false
+          git merge --no-commit --no-ff "$SHA" || merge_ok=false
 
           # Upstream's changes under .github/workflows/ are discarded, in the clean and
           # the conflicted case alike, so this fork's CI is not replaced by upstream's
@@ -144,10 +207,14 @@ jobs:
 
           if [ "$merge_ok" = true ]; then
             echo "clean=true" >> "$GITHUB_OUTPUT"
-            git commit --no-edit
+            git commit -m "Merge nextcloud/talk-desktop release $TAG" -m "Upstream commit $SHA (tag $TAG)."
           else
             echo "clean=false" >> "$GITHUB_OUTPUT"
-            git commit -m "chore: merge nextcloud/talk-desktop main (conflicts need manual resolution)"
+            git commit -m "Merge nextcloud/talk-desktop release $TAG (conflicts need manual resolution)" -m "Upstream commit $SHA (tag $TAG)."
+          fi
+          if [ "$(git rev-parse HEAD^2)" != "$SHA" ]; then
+            echo "::error::The sync commit's second parent is not upstream $TAG ($SHA)."
+            exit 1
           fi
           if [ -n "$(git diff --name-only HEAD^1 HEAD -- .github/workflows/)" ]; then
             echo "::error::The sync merge still changes .github/workflows/; it must not."
@@ -159,15 +226,16 @@ jobs:
         if: steps.check.outputs.count != '0' && steps.existing.outputs.pr == ''
         env:
           BASE_SHA: ${{ steps.merge.outputs.base }}
+          SHA: ${{ steps.check.outputs.sha }}
         run: |
-          # Listed against the pre-merge base: after the merge HEAD contains
-          # upstream/main, so HEAD..upstream/main is empty. Capped so a large sync
-          # stays under GitHub's 65,536-character PR body limit.
-          total=$(git rev-list --count "$BASE_SHA..upstream/main")
-          log=$(git log --max-count=300 --format='- %h %s' "$BASE_SHA..upstream/main")
+          # Listed against the pre-merge base: after the merge HEAD contains the
+          # release, so HEAD..$SHA is empty. Capped so a large sync stays under
+          # GitHub's 65,536-character PR body limit.
+          total=$(git rev-list --count "$BASE_SHA..$SHA")
+          log=$(git log --max-count=300 --format='- %h %s' "$BASE_SHA..$SHA")
           if [ "$total" -gt 300 ]; then
             log="$log
-          - ... and $((total - 300)) more (git log $BASE_SHA..upstream/main)"
+          - ... and $((total - 300)) more (git log $BASE_SHA..$SHA)"
           fi
           {
             echo "log<<EOF"
@@ -179,13 +247,14 @@ jobs:
         if: steps.check.outputs.count != '0' && steps.existing.outputs.pr == '' && inputs.dry_run != true
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
         run: |
           # The branch is workflow-owned and no open PR uses it (checked above), so it may be
           # replaced - but only if it is still exactly what checkout fetched (or still absent).
           # A commit pushed to it since then makes this push fail instead of vanishing. (XEN-284)
-          expected=$(git rev-parse -q --verify "refs/remotes/origin/upstream-sync/main" || true)
-          echo "Replacing upstream-sync/main (lease: ${expected:-must not exist}) with $(git rev-parse HEAD)"
-          git push --force-with-lease="upstream-sync/main:${expected}" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" upstream-sync/main
+          expected=$(git rev-parse -q --verify "refs/remotes/origin/$BRANCH" || true)
+          echo "Replacing $BRANCH (lease: ${expected:-must not exist}) with $(git rev-parse HEAD)"
+          git push --force-with-lease="$BRANCH:${expected}" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BRANCH"
 
       # Created via the REST API rather than `gh pr create`: the CLI goes through the
       # GraphQL createPullRequest mutation, which refused an App installation token with
@@ -196,6 +265,9 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           UPSTREAM_COUNT: ${{ steps.check.outputs.count }}
+          TAG: ${{ steps.check.outputs.tag }}
+          SHA: ${{ steps.check.outputs.sha }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
           UPSTREAM_LOG: ${{ steps.log.outputs.log }}
           MERGE_CLEAN: ${{ steps.merge.outputs.clean }}
           DROPPED_WORKFLOWS: ${{ steps.merge.outputs.dropped }}
@@ -214,7 +286,7 @@ jobs:
           fi
 
           body=$(cat <<EOF
-          Automated sync check against [nextcloud/talk-desktop](https://github.com/nextcloud/talk-desktop) main.
+          Automated sync to upstream release [nextcloud/talk-desktop $TAG](https://github.com/nextcloud/talk-desktop/releases/tag/$TAG) (commit \`$SHA\`). The sync follows upstream releases, not the tip of upstream main (XEN-396).
 
           $status_line
 
@@ -230,7 +302,7 @@ jobs:
 
           After merging, run \`gh workflow list --all\` and check that no upstream workflow is enabled.
 
-          ## Upstream commits
+          ## Upstream commits up to $TAG
 
           ${fence}text
           $UPSTREAM_LOG
@@ -239,8 +311,8 @@ jobs:
           )
 
           jq -n \
-            --arg title "Upstream sync: $UPSTREAM_COUNT new commit(s) from nextcloud/talk-desktop" \
-            --arg head "upstream-sync/main" \
+            --arg title "Upstream sync: nextcloud/talk-desktop $TAG ($UPSTREAM_COUNT new commit(s))" \
+            --arg head "$BRANCH" \
             --arg base "main" \
             --arg body "$body" \
             '{title: $title, head: $head, base: $base, body: $body}' \
@@ -251,10 +323,12 @@ jobs:
         if: steps.check.outputs.count != '0' && steps.existing.outputs.pr == '' && inputs.dry_run == true
         env:
           UPSTREAM_COUNT: ${{ steps.check.outputs.count }}
+          TAG: ${{ steps.check.outputs.tag }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
           MERGE_CLEAN: ${{ steps.merge.outputs.clean }}
           BASE: ${{ github.event.repository.default_branch }}
         run: |
-          msg="DRY RUN: would replace upstream-sync/main in $GITHUB_REPOSITORY with $(git rev-parse --short HEAD) and open a PR against $BASE ($UPSTREAM_COUNT upstream commit(s), clean merge: $MERGE_CLEAN). Nothing was pushed."
+          msg="DRY RUN: would replace $BRANCH in $GITHUB_REPOSITORY with $(git rev-parse --short HEAD) and open a PR against $BASE for upstream release $TAG ($UPSTREAM_COUNT upstream commit(s), clean merge: $MERGE_CLEAN). Nothing was pushed."
           echo "::notice title=Upstream sync dry run::$msg"
           echo "$msg" >> "$GITHUB_STEP_SUMMARY"
 
@@ -265,18 +339,26 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BEHIND: ${{ steps.check.outputs.count }}
+          TAG: ${{ steps.check.outputs.tag }}
           MAIN_SHA: ${{ steps.check.outputs.main }}
+          DRY_RUN: ${{ inputs.dry_run == true }}
         run: |
           reasons=()
 
+          # The release lookup failed, so nothing below can be judged.
+          if [ -z "$TAG" ] || [ -z "$MAIN_SHA" ]; then
+            echo "::error title=Upstream sync drift::Could not determine the upstream release to sync to; see the steps above."
+            exit 1
+          fi
+
           if [ "${BEHIND:-0}" -gt "$DRIFT_MAX_BEHIND" ]; then
-            reasons+=("main is $BEHIND upstream commit(s) behind (limit $DRIFT_MAX_BEHIND)")
+            reasons+=("main is $BEHIND commit(s) behind upstream release $TAG (limit $DRIFT_MAX_BEHIND)")
           fi
 
           # The open sync PR, including one this run has just opened.
           pr_json=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 \
             --json number,headRefName,createdAt,mergeable \
-            --jq '[.[] | select(.headRefName == "upstream-sync/main")][0] // empty')
+            --jq '[.[] | select(.headRefName | startswith("upstream-sync/"))][0] // empty')
 
           if [ -n "$pr_json" ]; then
             number=$(jq -r .number <<<"$pr_json")
@@ -288,6 +370,12 @@ jobs:
 
             if [ "$age_days" -ge "$DRIFT_MAX_PR_AGE_DAYS" ]; then
               reasons+=("sync PR #$number has been open $age_days day(s) (limit $DRIFT_MAX_PR_AGE_DAYS)")
+            fi
+
+            # Upstream released again while this PR waited (or it is the pre-XEN-396
+            # upstream-sync/main branch). Only when main still lacks the newest release.
+            if [ "$head" != "upstream-sync/$TAG" ] && [ "${BEHIND:-0}" -gt 0 ]; then
+              reasons+=("sync PR #$number ($head) is not for the newest upstream release $TAG")
             fi
 
             # Main moved on and the PR no longer merges.
@@ -311,6 +399,10 @@ jobs:
             fi
           else
             echo "No open sync PR."
+            # Behind the newest release with no PR open: the PR step did not run or failed.
+            if [ "${BEHIND:-0}" -gt 0 ] && [ "$DRY_RUN" != "true" ]; then
+              reasons+=("main is missing upstream release $TAG ($BEHIND commit(s)) and no sync PR is open")
+            fi
           fi
 
           if [ "${#reasons[@]}" -gt 0 ]; then
@@ -324,4 +416,4 @@ jobs:
             for r in "${reasons[@]}"; do echo "::error title=Upstream sync drift::$r"; done
             exit 1
           fi
-          echo "No drift: within $DRIFT_MAX_BEHIND commits and no stale or conflicted sync PR."
+          echo "No drift: within $DRIFT_MAX_BEHIND commits of upstream release $TAG and no stale, outdated or conflicted sync PR."
