@@ -667,6 +667,13 @@ module.exports = {
 		},
 		new FusesPlugin({
 			version: FuseVersion.V1,
+			// Without osxSign the plugin ad-hoc re-signs only the arm64 slice after flipping fuses,
+			// which adds _CodeSignature files that the x64 slice lacks, and stitching the universal
+			// app then fails ("the number of mach-o files is not the same"). That is every unsigned
+			// universal build, e.g. build-macos on PRs (XEN-397). Signed builds set osxSign and are
+			// not affected; they are signed after stitching anyway. Single-arch builds keep the
+			// plugin's default.
+			...(!hasMacosSign && argArch === 'universal' ? { resetAdHocDarwinSignature: false } : {}),
 			[FuseV1Options.RunAsNode]: false,
 			[FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
 			[FuseV1Options.EnableNodeCliInspectArguments]: false,
