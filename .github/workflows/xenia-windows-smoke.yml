@@ -5,7 +5,8 @@ name: Xenia Windows smoke test
 
 # Installs the Windows MSI on real x64 Windows, starts it the way a user does (Start
 # menu shortcut), and checks the app is still running with a window 30 seconds later.
-# Then it does the same as an upgrade over the latest published release. XEN-390.
+# Then it does the same as an upgrade over the release before the candidate. XEN-390,
+# XEN-400.
 #
 # Why: XEN-386 (the MSI installed but the app never started) passed every build check,
 # because nothing ever opened the installed app. Hosted runners have no real desktop
@@ -31,7 +32,7 @@ on:
         description: "Run id of a Xenia CI or Xenia Release run whose Windows artifact to test"
         required: true
       previous_tag:
-        description: "Release tag to upgrade from (empty = latest published release, 'none' = skip upgrade test)"
+        description: "Release tag to upgrade from (empty = newest published release older than the candidate, 'none' = skip upgrade test)"
         required: false
         default: ""
 
@@ -93,6 +94,10 @@ jobs:
           if ($run.conclusion -ne 'success') { $reasons += 'run did not succeed' }
           if ($reasons) { throw "Refusing run $($env:RUN_ID): $($reasons -join '; ')." }
           Write-Host "Source run $($env:RUN_ID) accepted (push build, $($run.head_sha))."
+          # A release run's candidate is its tag (validated above); a CI build of main has none.
+          $candidateTag = if ($okRel) { $run.head_branch } else { '' }
+          "CANDIDATE_TAG=$candidateTag" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          Write-Host "Candidate tag: $(if ($candidateTag) { $candidateTag } else { '(none, CI build of main)' })"
 
       # Release runs name the artifact release-windows; a dispatch may point at either kind.
       - name: Download candidate (CI artifact name)
@@ -125,7 +130,28 @@ jobs:
           if ($env:PREVIOUS_TAG -eq 'none') { Write-Host 'Upgrade test skipped (previous_tag=none).'; exit 0 }
           $h = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'xenia-windows-smoke'; Accept = 'application/vnd.github+json' }
           $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases"
-          $rel = if ($env:PREVIOUS_TAG) { Invoke-RestMethod -Headers $h "$api/tags/$env:PREVIOUS_TAG" } else { Invoke-RestMethod -Headers $h "$api/latest" }
+          # XEN-400: once a release is published, "latest" is the candidate itself, which turns
+          # the upgrade test into a same-version reinstall. For a release candidate, take the
+          # newest published, non-draft, non-prerelease release older than the candidate tag.
+          function TagVersion($t) { if ("$t" -match '^v([0-9]+(\.[0-9]+){1,3})$') { [version]$Matches[1] } else { $null } }
+          if ($env:PREVIOUS_TAG) {
+            $rel = Invoke-RestMethod -Headers $h "$api/tags/$env:PREVIOUS_TAG"
+          } elseif ($env:CANDIDATE_TAG) {
+            # Assign first: Windows PowerShell emits a JSON array as one object until it is enumerated.
+            $list = Invoke-RestMethod -Headers $h "$api`?per_page=100"
+            $all = $list | Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -ne $env:CANDIDATE_TAG }
+            $cv = TagVersion $env:CANDIDATE_TAG
+            $rel = if ($cv) {
+              $all | Where-Object { $v = TagVersion $_.tag_name; $v -and $v -lt $cv } | Sort-Object { TagVersion $_.tag_name } -Descending | Select-Object -First 1
+            } else {
+              $all | Sort-Object { [datetime]$_.published_at } -Descending | Select-Object -First 1
+            }
+            if (-not $rel) { throw "No published release older than candidate $($env:CANDIDATE_TAG) to upgrade from. Dispatch with previous_tag=none to skip the upgrade test." }
+          } else {
+            $rel = Invoke-RestMethod -Headers $h "$api/latest"
+          }
+          Write-Host "Candidate tag: $(if ($env:CANDIDATE_TAG) { $env:CANDIDATE_TAG } else { '(none, CI build of main)' }); previous tag: $($rel.tag_name)"
+          if ($env:CANDIDATE_TAG -and $rel.tag_name -eq $env:CANDIDATE_TAG) { throw "Previous release equals the candidate ($($rel.tag_name)): that would test a reinstall, not an upgrade." }
           $asset = $rel.assets | Where-Object name -like '*windows-x64.msi' | Select-Object -First 1
           if (-not $asset) { Write-Host "::warning::Release $($rel.tag_name) has no Windows MSI; upgrade test skipped."; exit 0 }
           $h.Accept = 'application/octet-stream'
