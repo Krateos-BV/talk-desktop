@@ -208,12 +208,20 @@ jobs:
               # The previous release may itself be broken (v26.10.31.0 is: XEN-386). Recorded, not gating.
               $r = LaunchAndCheck 'launch-previous'; $r.gating = $false; $result.steps += $r
             }
+            # XEN-411: the previous app is deliberately left running, as it is for a user who
+            # upgrades with Talk open in the tray. The installer must close it itself.
+            $running = @(Get-Process -Name 'Xenia Talk' -ErrorAction SilentlyContinue).Count
             $rc = Install 'candidate' "$in\candidate.msi"
-            $result.steps += @{ step = 'install-candidate'; ok = ($rc -eq 0 -or $rc -eq 3010); exit_code = $rc }
+            # 3010 means a file was in use and its delete was deferred to a reboot (XEN-411).
+            $result.steps += @{ step = 'install-candidate'; ok = ($rc -eq 0); exit_code = $rc; app_running_before = $running;
+                                why = $(if ($rc -eq 0) { '' } elseif ($rc -eq 3010) { 'Exit 3010: restart required, files were in use' } else { "msiexec exit code $rc" }) }
             $r = LaunchAndCheck 'launch-candidate'
-            # After an upgrade only the new app-* folder may remain: a leftover makes the stub fail (XEN-386).
-            if ($r.app_dirs.Count -gt 1) { $r.ok = $false; $r.why = "More than one app-* folder: $($r.app_dirs -join ', ')" }
             $result.steps += $r
+            # After an upgrade only the new app-* folder may remain (XEN-386, XEN-411). Reported
+            # as its own step so a failure says whether the app started or the folder was left.
+            $dirs = @($r.app_dirs)
+            $result.steps += @{ step = 'single-app-folder'; ok = ($dirs.Count -eq 1); app_dirs = $dirs;
+                                why = $(if ($dirs.Count -eq 1) { '' } else { "Expected one app-* folder, found $($dirs.Count): $($dirs -join ', ')" }) }
           } catch {
             $result.steps += @{ step = 'script'; ok = $false; why = $_.ToString() }
           }

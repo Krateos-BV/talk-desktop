@@ -324,6 +324,35 @@ module.exports = {
 						IgnoreFailure: 'yes',
 					}).appendTo($executableFile)
 
+					// XEN-411: an upgrade run while the app is open left the old app-{version}
+					// folder behind. Restart Manager logged that it had shut the app down, yet
+					// app-{old}\resources\app.asar was still locked (error 32), so Windows Installer
+					// deferred its delete to a reboot (exit code 3010, REBOOT=ReallySuppress).
+					// Force-close the app before InstallValidate, and so before RemoveExistingProducts
+					// (MajorUpgrade afterInstallValidate), so the old folder can be removed.
+					// Immediate and impersonated: the app runs as the installing user.
+					// Return="ignore": taskkill exits 128 when the app is not running.
+					const $product = $('Product')
+					$('<CustomAction/>').attr({
+						Id: 'XeniaCloseRunningAppCmd',
+						Property: 'WixQuietExec64CmdLine',
+						Value: `"[System64Folder]taskkill.exe" /F /T /IM "${BUILD_CONFIG.applicationName}.exe"`,
+					}).appendTo($product)
+					$('<CustomAction/>').attr({
+						Id: 'XeniaCloseRunningApp',
+						BinaryKey: 'WixCA',
+						DllEntry: 'WixQuietExec64',
+						Execute: 'immediate',
+						Return: 'ignore',
+					}).appendTo($product)
+					let $sequence = $product.children('InstallExecuteSequence').first()
+					if (!$sequence.length) {
+						$sequence = $('<InstallExecuteSequence></InstallExecuteSequence>').appendTo($product)
+					}
+					$sequence
+						.append($('<Custom/>').attr({ Action: 'XeniaCloseRunningAppCmd', Before: 'XeniaCloseRunningApp' }))
+						.append($('<Custom/>').attr({ Action: 'XeniaCloseRunningApp', Before: 'InstallValidate' }))
+
 					// The file must be re-saved
 					const wxsContent = $.xml()
 					fs.writeFileSync(wxs.wxsFile, wxsContent, 'utf8')
