@@ -82,6 +82,10 @@ jobs:
           CHANNEL: stable
         run: npm run release:package -- --windows
 
+      # XEN-398: one built-in Talk on every platform, from the @nextcloud/talk pin.
+      - name: Check built-in Talk matches the pin
+        run: node scripts/xenia-check-built-in-talk.mjs
+
       - uses: actions/upload-artifact@v4
         with:
           name: xenia-talk-windows
@@ -107,11 +111,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Fetch built-in Talk
-        run: |
-          TALK_VERSION=$(node -p "require('./package.json').talk.stable")
-          git clone --branch="$TALK_VERSION" --depth=1 https://github.com/nextcloud/spreed out/.temp/spreed
-          npm ci --prefix out/.temp/spreed
+      # XEN-398: one built-in Talk on every platform, from the @nextcloud/talk pin.
+      - name: Check built-in Talk matches the pin
+        run: node scripts/xenia-check-built-in-talk.mjs
 
       # Signing is exercised here ONLY on a manual dispatch, never on push or
       # pull_request. Two reasons. Signing plus notarisation adds minutes and a
@@ -171,7 +173,6 @@ jobs:
 
       - name: Build macOS app bundle (universal)
         env:
-          TALK_PATH: out/.temp/spreed
           CHANNEL: stable
           # Empty on push/PR, so hasMacosSign stays false and this is the
           # unsigned build it has always been.
@@ -195,7 +196,6 @@ jobs:
       # (--from-package reuses it): .zip and .dmg.
       - name: Make macOS .zip and .dmg
         env:
-          TALK_PATH: out/.temp/spreed
           CHANNEL: stable
         run: npm run package:mac
 
@@ -248,11 +248,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Fetch built-in Talk
-        run: |
-          TALK_VERSION=$(node -p "require('./package.json').talk.stable")
-          git clone --branch="$TALK_VERSION" --depth=1 https://github.com/nextcloud/spreed out/.temp/spreed
-          npm ci --prefix out/.temp/spreed
+      # XEN-398: one built-in Talk on every platform, from the @nextcloud/talk pin.
+      - name: Check built-in Talk matches the pin
+        run: node scripts/xenia-check-built-in-talk.mjs
 
       # maker-flatpak shells out to flatpak-builder and eu-strip (elfutils), and
       # flatpak-builder resolves the runtime/sdk/base refs that forge.config.js pins
@@ -280,7 +278,6 @@ jobs:
       #     (platforms: darwin); the platform filter then drops it and no .zip is made.
       - name: Build and package Linux (Flatpak + zip)
         env:
-          TALK_PATH: out/.temp/spreed
           CHANNEL: stable
         run: |
           npm run build:linux
