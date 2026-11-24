@@ -13,7 +13,7 @@ import { useBadgeCountIntegration } from './useBadgeCountIntegration.ts'
 
 // The Talk reference widget (upstream 42fd3c61) needs built-in Talk v25.0.8 or later
 // (src/integrations/reference). We pin v25.0.6 until the v25.0.8 pin is compat-tested in its
-// own PR (XEN-385 plan step 8); restore this import together with that pin change.
+// own PR (XEN-398, after the XEN-385 plan step 8); restore this import together with that pin change.
 // import '@nextcloud/talk/src/integrations/reference/reference.ts'
 
 const emit = defineEmits<{

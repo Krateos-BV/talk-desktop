@@ -136,10 +136,5 @@
     "sharp": true
   },
   "desktopName": "eu.xeniacloud.talk.desktop",
-  "productName": "Xenia Talk",
-  "talk": {
-    "stable": "v25.0.0",
-    "beta": "v25.0.0",
-    "dev": "main"
-  }
+  "productName": "Xenia Talk"
 }
