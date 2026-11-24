@@ -11,8 +11,8 @@ name: Xenia Release
 #
 # The build jobs mirror .github/workflows/xenia-ci.yml - same platform caveats apply
 # (Flatpak needs a toolchain; macOS ships both the .zip and the .dmg). The difference is
-# CHANNEL=stable, which selects the Talk version bundled (package.json talk.stable) and
-# drops the channel infix from artifact names.
+# CHANNEL=stable, which drops the channel infix from artifact names. The bundled Talk is
+# the @nextcloud/talk pin in package.json on every platform (XEN-398).
 #
 # The release is deliberately NOT marked as a prerelease: a client built with
 # CHANNEL=stable only ever considers non-prerelease releases, so flagging it would hide
@@ -79,6 +79,10 @@ jobs:
       - name: Package Windows (MSI + EXE)
         run: npm run release:package -- --windows
 
+      # XEN-398: one built-in Talk on every platform, from the @nextcloud/talk pin.
+      - name: Check built-in Talk matches the pin
+        run: node scripts/xenia-check-built-in-talk.mjs
+
       - uses: actions/upload-artifact@v4
         with:
           name: release-windows
@@ -98,11 +102,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Fetch built-in Talk
-        run: |
-          TALK_VERSION=$(node -p "require('./package.json').talk.stable")
-          git clone --branch="$TALK_VERSION" --depth=1 https://github.com/nextcloud/spreed out/.temp/spreed
-          npm ci --prefix out/.temp/spreed
+      # XEN-398: one built-in Talk on every platform, from the @nextcloud/talk pin.
+      - name: Check built-in Talk matches the pin
+        run: node scripts/xenia-check-built-in-talk.mjs
 
       # Signing is opt-in and degrades safely. With no APPLE_* secrets resolvable this
       # step reports "unsigned" and exits 0, forge.config.js's `hasMacosSign` stays false,
@@ -192,7 +194,6 @@ jobs:
 
       - name: Build macOS app bundle (universal)
         env:
-          TALK_PATH: out/.temp/spreed
           # forge.config.js:156 gates on these three. Empty values leave hasMacosSign
           # false, which is the unsigned path - not a failure.
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -218,8 +219,6 @@ jobs:
       # Shipping the .dmg is what lets macOS clients auto-match an installer, since
       # currentInstallerExt is 'dmg' on macOS.
       - name: Make macOS .zip and .dmg
-        env:
-          TALK_PATH: out/.temp/spreed
         run: npm run package:mac
 
       # MakerDMG wraps the signed .app but leaves the .dmg container itself unsigned
@@ -260,11 +259,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Fetch built-in Talk
-        run: |
-          TALK_VERSION=$(node -p "require('./package.json').talk.stable")
-          git clone --branch="$TALK_VERSION" --depth=1 https://github.com/nextcloud/spreed out/.temp/spreed
-          npm ci --prefix out/.temp/spreed
+      # XEN-398: one built-in Talk on every platform, from the @nextcloud/talk pin.
+      - name: Check built-in Talk matches the pin
+        run: node scripts/xenia-check-built-in-talk.mjs
 
       - name: Set up Flatpak toolchain
         run: |
@@ -279,8 +276,6 @@ jobs:
 
       # No --targets here, deliberately - see the note in xenia-ci.yml.
       - name: Build and package Linux (Flatpak + zip)
-        env:
-          TALK_PATH: out/.temp/spreed
         run: |
           npm run build:linux
           npm run package:linux

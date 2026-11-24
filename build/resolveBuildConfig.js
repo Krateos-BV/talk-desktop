@@ -82,11 +82,10 @@ function resolveBuildConfig() {
  * Resolve path to the build-in Talk
  */
 function resolveTalkPath() {
-	// TALK_PATH is kept on purpose (XEN-397): upstream v2.3.5 dropped it, but our CI and release
-	// workflows (xenia-ci.yml, xenia-release.yml) clone spreed at package.json talk.stable into
-	// out/.temp/spreed and point TALK_PATH at it. Without it the builds would silently switch the
-	// built-in Talk to node_modules/@nextcloud/talk. Changing the built-in Talk is its own PR after
-	// a compat test against the server. Without TALK_PATH, upstream's .overrides/spreed applies.
+	// TALK_PATH is kept for local development only (upstream v2.3.5 dropped it). CI and release builds
+	// package node_modules/@nextcloud/talk on every platform, and
+	// scripts/xenia-check-built-in-talk.mjs fails them if TALK_PATH is set or the installed version
+	// differs from the package.json pin (XEN-398). Without TALK_PATH, upstream's .overrides/spreed applies.
 	const talkOverridesPath = resolve(process.env.TALK_PATH || resolve(__dirname, '../.overrides/spreed'))
 
 	// Currently in npm this is always "./node_modules/@nextcloud/talk"
